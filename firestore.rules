@@ -1,0 +1,120 @@
+rules_version = '2';
+
+/**
+ * Firestore security rules for the AGMS vessel listings site.
+ *
+ * STATUS: deployed to project `agmslistings`. If you edit this file locally,
+ * re-deploy with `firebase deploy --only firestore` or it will have no effect.
+ *
+ * Data model — collection `vessels`, one document per listing.
+ * The document ID is the public URL id (`v-1000`, `v-1001`, ...), so a listing's
+ * `/vessels/:id` link survives a move from the old static data to Firestore.
+ *
+ *   wbsId       string   e.g. "WBS 1000"
+ *   title       string
+ *   sector      string   e.g. "For sale", "For charter"
+ *   category    string   one of CATEGORY_LIST
+ *   location    string
+ *   price       string   free text: "POA", "1,950,000 USD"
+ *   image       string   absolute https URL
+ *   specs       list     [{ label, value }] — Built / LOA / Beam / Draft / Power / Class
+ *   summary     string
+ *   description string
+ *   published   bool     false keeps a draft hidden from the public site
+ *   createdAt   timestamp
+ *   updatedAt   timestamp
+ *
+ * Authorisation model
+ * -------------------
+ * - Public visitors may read ONLY published listings. Drafts are invisible.
+ * - Writes require an authenticated account present in `admins/{uid}`.
+ * - There is deliberately NO enquiries collection: enquiries are handled by
+ *   Formspree / Privyr, not Firestore.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // The two owner accounts. Used ONLY to self-provision an `admins/{uid}`
+    // document on first sign-in, so no manual console seeding is required.
+    // Because authorisation afterwards reads `admins/{uid}`, access can be
+    // revoked per-user without touching these rules.
+    function bootstrapEmail() {
+      return request.auth.token.email in [
+        'netbiz0925@gmail.com',
+        'planalternative534@gmail.com'
+      ];
+    }
+
+    function isAdmin() {
+      return request.auth != null
+        && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // A listing must satisfy the whole public contract before it can be
+    // written, so a half-saved document can never appear on the site.
+    function validVessel(v) {
+      return v.keys().hasAll([
+          'wbsId', 'title', 'sector', 'category', 'location', 'price',
+          'image', 'specs', 'summary', 'description', 'published',
+          'createdAt', 'updatedAt'
+        ])
+        && v.wbsId is string       && v.wbsId.size() > 0        && v.wbsId.size() <= 32
+        && v.title is string       && v.title.size() > 0        && v.title.size() <= 200
+        && v.sector is string      && v.sector.size() > 0       && v.sector.size() <= 40
+        && v.category is string    && v.category.size() > 0     && v.category.size() <= 80
+        && v.location is string    && v.location.size() > 0     && v.location.size() <= 120
+        && v.price is string       && v.price.size() > 0        && v.price.size() <= 60
+        && v.image is string       && v.image.size() > 0        && v.image.size() <= 2048
+        && v.image.matches('https://.*')
+        && v.specs is list         && v.specs.size() <= 12
+        && v.summary is string     && v.summary.size() <= 2000
+        && v.description is string && v.description.size() <= 8000
+        && v.published is bool
+        && v.createdAt is timestamp
+        && v.updatedAt is timestamp;
+    }
+
+    // ---- Admin allowlist -------------------------------------------------
+    // A signed-in user may read ONLY their own document. This must not require
+    // isAdmin(), otherwise a first-time owner is denied the existence check
+    // that bootstraps their document, and no admin can ever be created.
+    // The document holds nothing sensitive (own email + timestamp).
+    match /admins/{uid} {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow list: if isAdmin();
+      // Self-provisioning is restricted to the two owner emails and may only
+      // ever create the caller's own document — this is what stops any random
+      // signed-in visitor from promoting themselves.
+      allow create: if request.auth != null
+                    && request.auth.uid == uid
+                    && bootstrapEmail()
+                    && request.resource.data.keys().hasOnly(['email', 'createdAt'])
+                    && request.resource.data.email == request.auth.token.email;
+      allow update, delete: if false;
+    }
+
+    // ---- Vessel listings -------------------------------------------------
+    match /vessels/{vesselId} {
+      // `isAdmin() ||` must come FIRST and must not reference `resource`.
+      //
+      // Firestore can only prove a query is safe if every clause is implied by
+      // the rule. `resource.data.published == true` forces public callers to
+      // filter on `published`, but it also rejects the admin dashboard's
+      // unfiltered `orderBy('category')` query — which is correct for the
+      // public and wrong for admins. Because `isAdmin()` does not depend on the
+      // document, it authorises the admin query outright while anonymous
+      // callers still only ever see published documents.
+      allow get: if isAdmin() || resource.data.published == true;
+      allow list: if isAdmin() || resource.data.published == true;
+
+      allow create: if isAdmin() && validVessel(request.resource.data);
+      allow update: if isAdmin() && validVessel(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // ---- Default deny ----------------------------------------------------
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

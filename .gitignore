@@ -1,0 +1,18 @@
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# Firebase client config. These values are technically public (they ship in the
+# browser bundle) but they are project-identifying, so keep them out of git and
+# supply them via the Vercel dashboard / local .env.local instead.
+.env
+.env.*
+!.env.example
+
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
