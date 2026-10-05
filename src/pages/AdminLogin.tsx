@@ -27,7 +27,7 @@ import {
   deleteVessel,
   listAllVessels,
   nextVesselId,
-  nextWbsId,
+  nextAgmId,
   seedVessels,
   setVesselPublished,
   updateVessel,
@@ -50,10 +50,10 @@ const WP = {
   muted: "#646970",
 } as const;
 
-function emptyDraft(id: string, wbsId: string): AdminVessel {
+function emptyDraft(id: string, agmId: string): AdminVessel {
   return {
     id,
-    wbsId,
+    agmId,
     published: false,
     title: "",
     sector: "For sale",
@@ -212,7 +212,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
         (category === "" || v.category === category) &&
         (q === "" ||
           v.title.toLowerCase().includes(q) ||
-          v.wbsId.toLowerCase().includes(q) ||
+          v.agmId.toLowerCase().includes(q) ||
           v.location.toLowerCase().includes(q) ||
           v.id.includes(q)),
     );
@@ -236,7 +236,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   };
 
   const openNew = async () => {
-    setEditing(emptyDraft(await nextVesselId(), await nextWbsId()));
+    setEditing(emptyDraft(await nextVesselId(), await nextAgmId()));
   };
 
   const menu: { key: View; label: string; icon: typeof Ship; count?: number }[] = [
@@ -523,7 +523,7 @@ function DashboardHome({
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{v.title}</p>
                     <p className="truncate text-xs" style={{ color: WP.muted }}>
-                      {v.id} · {v.wbsId} · {v.category}
+                      {v.id} · {v.agmId} · {v.category}
                     </p>
                   </div>
                   <span
@@ -686,7 +686,7 @@ function VesselsView({
                 <td className="whitespace-nowrap border-b px-3 py-2 text-xs" style={{ borderColor: WP.border, color: WP.muted }}>
                   {v.id}
                   <br />
-                  {v.wbsId}
+                  {v.agmId}
                 </td>
                 <td className="border-b px-3 py-2 text-xs" style={{ borderColor: WP.border }}>
                   {v.category}
@@ -833,7 +833,7 @@ function VesselForm({
           style={{ borderColor: WP.border }}
         >
           <h2 className="text-sm font-semibold">
-            {draft.title ? `Edit Vessel — ${draft.wbsId}` : `Add Vessel — ${draft.wbsId}`}
+            {draft.title ? `Edit Vessel — ${draft.agmId}` : `Add Vessel — ${draft.agmId}`}
           </h2>
           <button onClick={onClose} className="text-xs" style={{ color: WP.muted }}>
             Close

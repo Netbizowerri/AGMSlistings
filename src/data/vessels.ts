@@ -1,6 +1,7 @@
 export type Vessel = {
   id: string;
-  wbsId: string;
+  /** Unique listing reference, e.g. "AGM 1000" */
+  agmId: string;
   title: string;
   sector: string;
   category: string;
@@ -239,7 +240,7 @@ Object.keys(rows).forEach((category) => {
     const index = counter++;
     built.push({
       id: `v-${1000 + index}`,
-      wbsId: `WBS ${1000 + index}`,
+      agmId: `AGM ${1000 + index}`,
       title,
       sector,
       category,

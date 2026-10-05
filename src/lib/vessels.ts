@@ -106,15 +106,15 @@ export async function getVessel(id: string): Promise<Vessel | null> {
   return { ...data, id: snap.id };
 }
 
-/** Next free numeric id / WBS reference. Used when adding a listing. */
+/** Next free numeric id / AGM reference. Used when adding a listing. */
 async function highestNumericSuffix(): Promise<number> {
   const snap = await getDocs(query(collection(getFirestoreDb(), COLLECTION), limit(1000)));
   let max = 999;
   for (const d of snap.docs) {
     const fromId = Number(d.id.replace(/^v-/, ""));
     if (Number.isFinite(fromId) && fromId > max) max = fromId;
-    const fromWbs = Number(String(d.data().wbsId ?? "").replace(/\D/g, ""));
-    if (Number.isFinite(fromWbs) && fromWbs > max) max = fromWbs;
+    const fromAgm = Number(String(d.data().agmId ?? d.data().wbsId ?? "").replace(/\D/g, ""));
+    if (Number.isFinite(fromAgm) && fromAgm > max) max = fromAgm;
   }
   return max;
 }
@@ -123,8 +123,8 @@ export async function nextVesselId(): Promise<string> {
   return `v-${(await highestNumericSuffix()) + 1}`;
 }
 
-export async function nextWbsId(): Promise<string> {
-  return `WBS ${(await highestNumericSuffix()) + 1}`;
+export async function nextAgmId(): Promise<string> {
+  return `AGM ${(await highestNumericSuffix()) + 1}`;
 }
 
 export async function createVessel(
