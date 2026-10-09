@@ -96,7 +96,17 @@ function toDoc(vessel: Vessel) {
 
 function fromSnapshot(snap: QueryDocumentSnapshot): Vessel {
   const data = snap.data() as VesselDoc;
-  return { ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) };
+  return toPublic({ ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) });
+}
+
+/**
+ * Shapes a listing for the PUBLIC site. Broker identity is admin-only, so the
+ * internal `brokerId` link is dropped here; the public `Vessel` type does not
+ * even carry the field once it leaves this module.
+ */
+function toPublic(v: Vessel): Vessel {
+  const { brokerId: _brokerId, ...rest } = v;
+  return rest;
 }
 
 /** Same as `fromSnapshot`, but keeps the draft/published flag. */
@@ -141,7 +151,7 @@ export async function getVessel(id: string): Promise<Vessel | null> {
   if (!snap.exists()) return null;
   const data = snap.data() as VesselDoc;
   if (!data.published) return null;
-  return { ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) };
+  return toPublic({ ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) });
 }
 
 /** Next free numeric id / AGM reference. Used when adding a listing. */

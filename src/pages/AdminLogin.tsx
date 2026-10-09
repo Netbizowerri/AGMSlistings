@@ -8,6 +8,7 @@ import {
   Download,
   Eye,
   EyeOff,
+  Handshake,
   LayoutDashboard,
   LogOut,
   MapPin,
@@ -40,10 +41,11 @@ import {
   updateVessel,
   type AdminVessel,
 } from "../lib/vessels";
+import { deleteBroker, listBrokers, resolveBrokerId, type Broker } from "../lib/brokers";
 import { CATEGORY_LIST } from "../data/vessels";
 
 type Status = { kind: "ok" | "err"; text: string } | null;
-type View = "dashboard" | "vessels";
+type View = "dashboard" | "vessels" | "brokers";
 
 const SPEC_LABELS = ["Built", "LOA", "Beam", "Draft", "Power / capacity", "Class"];
 
@@ -183,6 +185,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [view, setView] = useState<View>("dashboard");
   const [navOpen, setNavOpen] = useState(false);
   const [all, setAll] = useState<AdminVessel[]>([]);
+  const [brokers, setBrokers] = useState<Broker[]>([]);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<Status>(null);
   const [editing, setEditing] = useState<AdminVessel | null>(null);
@@ -196,6 +199,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     try {
       const rows = await listAllVessels();
       setAll(rows);
+      setBrokers(await listBrokers());
       setStatus(null);
 
       // First run against an empty database: import the existing catalogue so
@@ -246,6 +250,8 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
       categoryCount: byCategory.size,
       locations: new Set(all.map((v) => v.location)).size,
       sectors: new Set(all.map((v) => v.sector)).size,
+      // Brokers with at least one listing currently in the catalogue.
+      brokers: new Set(all.map((v) => v.brokerId ?? "").filter(Boolean)).size,
       categories: [...byCategory.entries()].sort(
         (a, b) => b[1] - a[1] || a[0].localeCompare(b[0]),
       ),
@@ -264,6 +270,13 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
           v.id.includes(q)),
     );
   }, [all, category, search]);
+
+  const brokerById = useMemo(() => new Map(brokers.map((b) => [b.id, b])), [brokers]);
+
+  const brokerName = useCallback(
+    (id?: string) => (id ? brokerById.get(id)?.name : undefined),
+    [brokerById],
+  );
 
   const runSeed = async () => {
     if (!window.confirm("Import any listings missing from the database?")) return;
@@ -289,6 +302,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const menu: { key: View; label: string; icon: typeof Ship; count?: number }[] = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { key: "vessels", label: "Vessels", icon: Ship, count: stats.total },
+    { key: "brokers", label: "Brokers", icon: Handshake, count: stats.brokers },
   ];
 
   const sidebarContent = (
@@ -411,11 +425,17 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
           </button>
           <div className="min-w-0">
             <h1 className="truncate text-sm font-semibold text-[#F0F4FF] md:text-base">
-              {view === "dashboard" ? "Dashboard" : "Vessel listings"}
+              {view === "dashboard"
+                ? "Dashboard"
+                : view === "brokers"
+                ? "Brokers"
+                : "Vessel listings"}
             </h1>
             <p className="hidden text-[11px] text-[#93A5C4] sm:block">
               {view === "dashboard"
                 ? "AGMS brokerage console"
+                : view === "brokers"
+                ? `${stats.brokers} broker${stats.brokers === 1 ? "" : "s"} with listings in the catalogue`
                 : `${stats.total} listings in the catalogue`}
             </p>
           </div>
@@ -453,6 +473,21 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
             <DashboardSkeleton />
           ) : view === "dashboard" ? (
             <DashboardHome stats={stats} vessels={all} onOpenVessels={() => setView("vessels")} />
+          ) : view === "brokers" ? (
+            <BrokersView
+              brokers={brokers}
+              vessels={all}
+              onDelete={async (id) => {
+                // Un-pin the broker's vessels (they become admin-owned) so the
+                // listing stays in the catalogue, then remove the record.
+                for (const v of all.filter((x) => x.brokerId === id)) {
+                  await updateVessel({ ...v, brokerId: "" }, v.published);
+                }
+                await deleteBroker(id);
+                await refresh();
+              }}
+              onError={(t) => setStatus({ kind: "err", text: t })}
+            />
           ) : (
             <VesselsView
               visible={visible}
@@ -463,6 +498,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
               search={search}
               setSearch={setSearch}
               seeding={seeding}
+              brokerName={brokerName}
               onSeed={runSeed}
               onAdd={openNew}
               onEdit={setEditing}
@@ -477,6 +513,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
         <VesselForm
           vessel={editing}
           categories={CATEGORY_LIST}
+          brokers={brokers}
           onClose={() => setEditing(null)}
           onSaved={async () => {
             setEditing(null);
@@ -502,6 +539,7 @@ type Stats = {
   categoryCount: number;
   locations: number;
   sectors: number;
+  brokers: number;
   categories: [string, number][];
 };
 
@@ -509,7 +547,7 @@ function DashboardSkeleton() {
   return (
     <div className="space-y-4" aria-hidden="true">
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 7 }).map((_, i) => (
           <div key={i} className={`${panelCls} p-4`}>
             <Skeleton className="h-10 w-10 rounded-lg" />
             <Skeleton className="mt-4 h-6 w-16" />
@@ -576,6 +614,7 @@ function DashboardHome({
         <Card label="Drafts" value={stats.drafts} icon={<EyeOff size={18} />} />
         <Card label="Locations" value={stats.locations} icon={<MapPin size={18} />} />
         <Card label="Sectors" value={stats.sectors} icon={<Anchor size={18} />} />
+        <Card label="Brokers" value={stats.brokers} icon={<Handshake size={18} />} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
@@ -666,6 +705,7 @@ function VesselsView({
   search,
   setSearch,
   seeding,
+  brokerName,
   onSeed,
   onAdd,
   onEdit,
@@ -680,6 +720,7 @@ function VesselsView({
   search: string;
   setSearch: (v: string) => void;
   seeding: boolean;
+  brokerName: (id?: string) => string | undefined;
   onSeed: () => void;
   onAdd: () => void;
   onEdit: (v: AdminVessel) => void;
@@ -851,6 +892,7 @@ function VesselsView({
                     "Category",
                     "Location",
                     "Price",
+                    "Broker",
                     "Status",
                     "Actions",
                   ].map((h) => (
@@ -903,6 +945,16 @@ function VesselsView({
                       {v.price}
                     </td>
                     <td className="px-4 py-3">
+                      {brokerName(v.brokerId) ? (
+                        <span className="inline-flex items-center gap-1 rounded-md border border-[#3A64C2]/40 bg-[#3A64C2]/15 px-2 py-0.5 text-[11px] font-semibold text-[#72AEE6]">
+                          <Handshake size={11} />
+                          {brokerName(v.brokerId)}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-[#6B7FA6]">Admin</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <StatusBadge published={v.published} />
                     </td>
                     <td className="px-4 py-3">
@@ -944,6 +996,12 @@ function VesselsView({
                   </p>
                   <p className="mt-0.5 truncate text-xs text-[#93A5C4]">
                     {v.category} · {v.location}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-[#93A5C4]">
+                    Broker:{" "}
+                    <span className={brokerName(v.brokerId) ? "text-[#72AEE6]" : ""}>
+                      {brokerName(v.brokerId) ?? "Admin"}
+                    </span>
                   </p>
                   <div className="mt-2 flex items-center justify-between gap-2">
                     <span className="text-sm font-semibold text-[#FFCC00]">{v.price}</span>
@@ -1021,11 +1079,221 @@ function RowActions({
   );
 }
 
+/* ------------------------------------------------------------------ brokers */
+
+function BrokersView({
+  brokers,
+  vessels,
+  onDelete,
+  onError,
+}: {
+  brokers: Broker[];
+  vessels: AdminVessel[];
+  onDelete: (id: string) => Promise<void>;
+  onError: (t: string) => void;
+}) {
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  const rows = brokers
+    .map((b) => ({ broker: b, linked: vessels.filter((v) => v.brokerId === b.id) }))
+    .sort((a, b) => b.linked.length - a.linked.length || a.broker.name.localeCompare(b.broker.name));
+
+  const activeCount = rows.filter((r) => r.linked.length > 0).length;
+
+  return (
+    <div className="space-y-4">
+      <div className={`${panelCls} p-4`}>
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3A64C2]/15 text-[#72AEE6]">
+            <Handshake size={18} />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-[#F0F4FF]">
+              {activeCount} broker{activeCount === 1 ? "" : "s"} with listings
+            </p>
+            <p className="text-xs text-[#93A5C4]">
+              Broker names, ownership and contacts are visible to admins only — never on the public site.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {rows.length === 0 ? (
+        <div className={`${panelCls} px-6 py-12 text-center`}>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#3A64C2]/15 text-[#72AEE6]">
+            <Handshake size={22} />
+          </div>
+          <p className="mt-4 font-medium text-[#F0F4FF]">No brokers yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-[#93A5C4]">
+            When you list a third-party vessel, fill in the broker name and contact on the Add
+            New form — the broker and their listings will appear here.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* Desktop table */}
+          <div className={`hidden md:block ${panelCls}`}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#1B3465] bg-[#050F24]/60">
+                  {["Broker", "Contact details", "Vessels listed", "Actions"].map((h) => (
+                    <th
+                      key={h}
+                      scope="col"
+                      className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#93A5C4]"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map(({ broker, linked }) => (
+                  <tr
+                    key={broker.id}
+                    className="border-b border-[#1B3465]/60 transition-colors last:border-0 hover:bg-[#12294D]/60"
+                  >
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="rounded-md border border-[#3A64C2]/40 bg-[#3A64C2]/15 px-2 py-1 text-xs font-semibold text-[#72AEE6]">
+                          <Handshake size={11} className="mr-1 inline" />
+                          {broker.name}
+                        </span>
+                        {linked.length === 0 && (
+                          <span className="text-[11px] text-[#6B7FA6]">no listings</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="max-w-xs px-4 py-3 text-xs leading-relaxed text-[#93A5C4]">
+                      {broker.phone || broker.email || broker.address ? (
+                        <div className="space-y-0.5">
+                          {broker.phone && <p className="truncate">Phone: {broker.phone}</p>}
+                          {broker.email && <p className="truncate">Email: {broker.email}</p>}
+                          {broker.address && <p className="line-clamp-2">Address: {broker.address}</p>}
+                        </div>
+                      ) : (
+                        <span className="text-[#6B7FA6]">Not provided</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {linked.length === 0 ? (
+                        <span className="text-xs text-[#6B7FA6]">—</span>
+                      ) : (
+                        <ul className="space-y-1">
+                          {linked.map((v) => (
+                            <li key={v.id} className="flex items-center gap-2 text-xs text-[#F0F4FF]">
+                              <span className="tabular-nums text-[#93A5C4]">{v.agmId}</span>
+                              <span className="truncate">{v.title}</span>
+                              <StatusBadge published={v.published} />
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <button
+                        disabled={deleting === broker.id}
+                        onClick={async () => {
+                          const label =
+                            linked.length > 0
+                              ? `Delete ${broker.name}? Their ${linked.length} listing${linked.length === 1 ? " becomes" : "s become"} admin-owned.`
+                              : `Delete ${broker.name}?`;
+                          if (!window.confirm(label)) return;
+                          setDeleting(broker.id);
+                          try {
+                            await onDelete(broker.id);
+                          } catch (err) {
+                            onError(readableFirestoreError(err));
+                          } finally {
+                            setDeleting(null);
+                          }
+                        }}
+                        className="rounded-lg border border-[#1B3465] p-2 text-[#93A5C4] transition-colors hover:border-[#F87171]/50 hover:bg-[#F87171]/10 hover:text-[#F87171] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 disabled:opacity-60"
+                        title="Delete broker"
+                        aria-label={`Delete broker ${broker.name}`}
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile cards */}
+          <ul className={`divide-y divide-[#1B3465] md:hidden ${panelCls}`}>
+            {rows.map(({ broker, linked }) => (
+              <li key={broker.id} className="p-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-md border border-[#3A64C2]/40 bg-[#3A64C2]/15 px-2 py-1 text-xs font-semibold text-[#72AEE6]">
+                      <Handshake size={11} className="mr-1 inline" />
+                      {broker.name}
+                    </span>
+                  </div>
+                  <button
+                    disabled={deleting === broker.id}
+                    onClick={async () => {
+                      const label =
+                        linked.length > 0
+                          ? `Delete ${broker.name}? Their ${linked.length} listing${linked.length === 1 ? " becomes" : "s become"} admin-owned.`
+                          : `Delete ${broker.name}?`;
+                      if (!window.confirm(label)) return;
+                      setDeleting(broker.id);
+                      try {
+                        await onDelete(broker.id);
+                      } catch (err) {
+                        onError(readableFirestoreError(err));
+                      } finally {
+                        setDeleting(null);
+                      }
+                    }}
+                    className="rounded-lg border border-[#1B3465] p-2 text-[#93A5C4] transition-colors hover:border-[#F87171]/50 hover:text-[#F87171] disabled:opacity-60"
+                    aria-label={`Delete broker ${broker.name}`}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+                <div className="mt-2 space-y-0.5 text-sm text-[#93A5C4]">
+                  {broker.phone || broker.email || broker.address ? (
+                    <>
+                      {broker.phone && <p className="truncate">Phone: {broker.phone}</p>}
+                      {broker.email && <p className="truncate">Email: {broker.email}</p>}
+                      {broker.address && <p className="line-clamp-2">Address: {broker.address}</p>}
+                    </>
+                  ) : (
+                    <p className="text-[#6B7FA6]">Contact details not provided</p>
+                  )}
+                </div>
+                {linked.length === 0 ? (
+                  <p className="mt-2 text-xs text-[#6B7FA6]">No listings currently.</p>
+                ) : (
+                  <ul className="mt-2 space-y-2">
+                    {linked.map((v) => (
+                      <li key={v.id} className="flex items-center gap-2 text-sm">
+                        <span className="tabular-nums text-[#93A5C4]">{v.agmId}</span>
+                        <span className="min-w-0 flex-1 truncate text-[#F0F4FF]">{v.title}</span>
+                        <StatusBadge published={v.published} />
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ------------------------------------------------------------------ form */
 
 function VesselForm({
   vessel,
   categories,
+  brokers,
   onClose,
   onSaved,
   onError,
@@ -1033,6 +1301,7 @@ function VesselForm({
 }: {
   vessel: AdminVessel;
   categories: string[];
+  brokers: Broker[];
   onClose: () => void;
   onSaved: () => Promise<void>;
   onError: (t: string) => void;
@@ -1043,6 +1312,15 @@ function VesselForm({
   // Remarks are edited as free text (one per line) so Enter behaves normally,
   // then split into an array on save.
   const [remarksText, setRemarksText] = useState((vessel.remarks ?? []).join("\n"));
+  // Broker identity lives in the admin-only `brokers` collection; the vessel
+  // only ever carries an opaque id. Prefill the fields from that record.
+  const existingBroker = vessel.brokerId
+    ? brokers.find((b) => b.id === vessel.brokerId)
+    : undefined;
+  const [brokerName, setBrokerName] = useState(existingBroker?.name ?? "");
+  const [brokerPhone, setBrokerPhone] = useState(existingBroker?.phone ?? "");
+  const [brokerEmail, setBrokerEmail] = useState(existingBroker?.email ?? "");
+  const [brokerAddress, setBrokerAddress] = useState(existingBroker?.address ?? "");
 
   const set = <K extends keyof AdminVessel>(key: K, value: AdminVessel[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -1194,6 +1472,26 @@ function VesselForm({
             </Field>
             <Field label="Contact (optional)" value={draft.contact ?? ""} onChange={(v) => set("contact", v)} />
 
+            <div className="rounded-lg border border-[#1B3465] bg-[#050F24] p-3 sm:col-span-2">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 text-sm font-medium text-[#93A5C4]">
+                  <Handshake size={14} className="text-[#72AEE6]" />
+                  Broker (admin-only)
+                </span>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Broker business name" value={brokerName} onChange={setBrokerName} />
+                <Field label="Broker phone number" value={brokerPhone} onChange={setBrokerPhone} />
+                <Field label="Broker email" value={brokerEmail} onChange={setBrokerEmail} />
+                <Field label="Broker address" value={brokerAddress} onChange={setBrokerAddress} />
+              </div>
+              <p className="mt-2 text-xs text-[#6B7FA6]">
+                Leave the business name blank for AGMS-owned listings. If filled, the listing is
+                attributed to the broker. All contact details are stored in the admin-only registry
+                and never shown on the public site.
+              </p>
+            </div>
+
             <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-[#1B3465] bg-[#050F24] px-4 py-3 text-sm font-medium text-[#F0F4FF] sm:col-span-2">
               <input
                 type="checkbox"
@@ -1211,8 +1509,13 @@ function VesselForm({
               onClick={async () => {
                 setBusy(true);
                 try {
+                  const brokerLabel = brokerName.trim();
+                  const brokerId = brokerLabel
+                    ? await resolveBrokerId(brokerLabel, brokerPhone.trim(), brokerEmail.trim(), brokerAddress.trim())
+                    : "";
                   await save({
                     ...draft,
+                    brokerId,
                     remarks: remarksText
                       .split("\n")
                       .map((line) => line.trim())

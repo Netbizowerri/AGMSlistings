@@ -23,8 +23,14 @@ rules_version = '2';
  *   summary     string
  *   description string
  *   published   bool     false keeps a draft hidden from the public site
+ *   brokerId    string   opaque link to a `brokers/{id}` record (admin-only);
+ *               empty/absent when AGMS owns the listing.
  *   createdAt   timestamp
  *   updatedAt   timestamp
+ *
+ * In addition to `vessels` there is a `brokers` collection holding broker
+ * identities — business name, phone, email and address. It is readable and
+ * writable by admins only, so broker identity never reaches the public site.
  *
  * Authorisation model
  * -------------------
@@ -93,6 +99,26 @@ service cloud.firestore {
                     && request.resource.data.keys().hasOnly(['email', 'createdAt'])
                     && request.resource.data.email == request.auth.token.email;
       allow update, delete: if false;
+    }
+
+    // ---- Brokers ---------------------------------------------------------
+    // Broker names and contacts are personal data and MUST never be reachable
+    // by the public. Vessel documents hold only an opaque `brokerId`; the
+    // actual identity lives in this collection, which only admins can read.
+    function validBroker(b) {
+      return b.keys().hasAll(['name', 'phone', 'email', 'address', 'createdAt', 'updatedAt'])
+        && b.name is string    && b.name.size() > 0    && b.name.size() <= 200
+        && b.phone is string   && b.phone.size() <= 60
+        && b.email is string   && b.email.size() <= 200
+        && b.address is string && b.address.size() <= 300
+        && b.createdAt is timestamp
+        && b.updatedAt is timestamp;
+    }
+
+    match /brokers/{brokerId} {
+      allow read: if isAdmin();
+      allow create, update: if isAdmin() && validBroker(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     // ---- Vessel listings -------------------------------------------------

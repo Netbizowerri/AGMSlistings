@@ -19,6 +19,13 @@ export type Vessel = {
   particulars?: { label: string; value: string }[];
   /** Optional named contact for this specific listing. */
   contact?: string;
+  /**
+   * Opaque reference to a broker record (see `src/lib/brokers.ts`). Filled only
+   * when a listing belongs to a third-party broker rather than AGMS itself.
+   * ADMIN-ONLY: broker names and contacts are never stored on the vessel
+   * document, and this id is stripped from every public read.
+   */
+  brokerId?: string;
 };
 
 const img = [
@@ -52,6 +59,7 @@ const rows: Record<string, Row[]> = {
     ["AHTS MARIDIVE 703 – For Sale", "EGYPT", "On Application", "2011", "—", "—", "—", "2 x MaK, 5,400 BHP (10,800 BHP total)", "ABS A1 (E), DPS-2, FiFi-1", "For sale"],
     ["AHTS MARIDIVE 704 – For Sale", "EGYPT", "USD 15M (region)", "2011", "—", "—", "—", "2 x MaK, 5,400 BHP (10,800 BHP total)", "ABS A1 (E), DPS-2, FiFi-1", "For sale"],
     ["DP-2 Diesel Electric Platform Supply Vessel (SPM ALPHA) – For Sale", "TAKORADI, GHANA", "USD 12.5M", "2006", "73.20 m", "16.50 m", "5.63 m", "2 x 1,920 kW Z-drive (diesel-electric)", "ABS A1, FFV 1, DPS-2", "For sale"],
+    ["5,050 DWT Deck Barge – For Sale", "ZHEJIANG, CHINA", "POA", "2020", "105.0 m", "20.0 m", "4.0 m", "2 x Weichai CW8200ZC-110, 350 kW", "CCS", "For sale"],
   ],
 };
 
@@ -328,6 +336,30 @@ const extras: Record<
       { label: "Currently employed", value: "Takoradi, Ghana until mid-November 2026" },
       { label: "Inspection", value: "Takoradi, Ghana post-charter" },
     ],
+  },
+  "5,050 DWT Deck Barge – For Sale": {
+    image: "https://i.ibb.co/hFT8N0B7/Whats-App-Image-2026-10-09-at-8-54-45-AM.jpg",
+    details:
+      "5,050 DWT deck barge built in 2020 in Zhejiang, China and classed with CCS. Single deck with double bottom / single side hull and one cargo hold. Twin Weichai CW8200ZC-110 main engines rated 350 kW each (700 kW total). Coastal navigation (China domestic). Low operating hours and well-maintained since delivery — suitable for sand, gravel, aggregates, bulk cargo or modular cargo, and ideal for coastal logistics, river-sea interface or project cargo support. Located in Zhejiang, China; available for inspection upon request. Competitive pricing, open for serious negotiation with quick delivery possible. All details given without guarantee.",
+    remarks: [
+      "Low operating hours, well-maintained since delivery",
+      "Suitable for sand, gravel, aggregates, bulk cargo or modular cargo",
+      "Strong Chinese-built quality with reliable Weichai propulsion",
+      "Ideal for coastal logistics, river-sea interface or project cargo support",
+      "Available for inspection in Zhejiang, China upon request",
+    ],
+    particulars: [
+      { label: "Vessel type", value: "Deck barge (single deck, double bottom / single side hull)" },
+      { label: "Builder", value: "Zhejiang, China" },
+      { label: "Moulded depth", value: "5.5 m" },
+      { label: "Light draft", value: "3.0 m" },
+      { label: "Cargo holds", value: "1" },
+      { label: "Main engine", value: "2 x Weichai CW8200ZC-110, 350 kW each (total 700 kW)" },
+      { label: "GT / NT", value: "3,000 / 1,700" },
+      { label: "Navigation area", value: "Coastal (China domestic)" },
+      { label: "Condition", value: "Low operating hours, well-maintained since delivery" },
+    ],
+    contact: "Anna (Vice President), WhatsApp +86 137 5861 8727",
   },
 };
 
