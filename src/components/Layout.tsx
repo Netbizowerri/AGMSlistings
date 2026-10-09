@@ -137,20 +137,12 @@ export default function Layout() {
 
           {/* Desktop CTA */}
           <div className="hidden lg:flex items-center gap-3">
-            <a
-              href="https://wa.me/2348073492253"
-              className="flex items-center gap-2 rounded-lg bg-[#25D366]/15 border border-[#25D366]/30 px-4 py-2 text-[13px] font-semibold text-[#25D366] hover:bg-[#25D366]/25 transition"
+            <Link
+              to="/contact"
+              className="flex items-center gap-2 rounded-lg bg-[#FFCC00] px-5 py-2 text-[13px] font-bold text-[#092E6D] hover:bg-[#E6B800] transition shadow-[0_0_20px_rgba(255,204,0,0.3)]"
             >
-              <Phone size={14} />
-              WhatsApp
-            </a>
-            <button
-              onClick={openChat}
-              className="flex items-center gap-2 rounded-lg bg-[#FFCC00] px-4 py-2 text-[13px] font-bold text-[#092E6D] hover:bg-[#E6B800] transition shadow-[0_0_20px_rgba(255,204,0,0.3)]"
-            >
-              <MessageCircle size={14} />
-              AI Chat
-            </button>
+              Get a Quote
+            </Link>
           </div>
 
           {/* Mobile menu button */}

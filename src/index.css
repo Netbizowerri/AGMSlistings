@@ -201,6 +201,13 @@ html, body {
 .cat-card:hover::before { opacity: 1; }
 .cat-card:hover { transform: translateY(-6px) scale(1.02); }
 
+/* Admin selects: pin option colours together so native dropdown popups can
+   never pair a system-white background with the select's light text. */
+.admin-select option {
+  background: #0B1E3D;
+  color: #F0F4FF;
+}
+
 /* Ocean particle bg */
 .ocean-particles {
   position: absolute;

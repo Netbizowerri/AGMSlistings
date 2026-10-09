@@ -25,6 +25,7 @@ export default function VesselSearch() {
   const [cat, setCat] = useState(searchParams.get("category") ?? "");
   const [sec, setSec] = useState(searchParams.get("sector") ?? ALL);
   const [loc, setLoc] = useState(searchParams.get("location") ?? ALL);
+  const [listingId, setListingId] = useState(searchParams.get("listingId") ?? searchParams.get("agmId") ?? "");
   const [limit, setLimit] = useState(PAGE);
   const [filtersOpen, setFiltersOpen] = useState(false);
 
@@ -41,6 +42,7 @@ export default function VesselSearch() {
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
+    const listing = listingId.trim().toLowerCase();
     return vessels.filter((v) => {
       const matchQ =
         !q ||
@@ -50,25 +52,31 @@ export default function VesselSearch() {
         v.category.toLowerCase().includes(q) ||
         v.location.toLowerCase().includes(q) ||
         v.sector.toLowerCase().includes(q);
+      const matchListing =
+        !listing ||
+        v.agmId.toLowerCase().replace(/\s+/g, " ").includes(listing) ||
+        v.agmId.toLowerCase().replace(/\s+/g, "").includes(listing.replace(/\s+/g, "")) ||
+        v.id.toLowerCase().replace(/\s+/g, "").includes(listing.replace(/\s+/g, ""));
       const matchCat = cat === "" || v.category === cat;
       const matchSec = sec === ALL || v.sector === sec;
       const matchLoc = loc === ALL || v.location === loc;
-      return matchQ && matchCat && matchSec && matchLoc;
+      return matchQ && matchCat && matchSec && matchLoc && matchListing;
     });
-  }, [vessels, query, cat, sec, loc]);
+  }, [vessels, query, cat, sec, loc, listingId]);
 
-  const hasActiveFilter = query || cat || sec !== ALL || loc !== ALL;
+  const hasActiveFilter = query || cat || sec !== ALL || loc !== ALL || listingId;
 
   const clearAll = () => {
     setQuery("");
     setCat("");
     setSec(ALL);
     setLoc(ALL);
+    setListingId("");
     setLimit(PAGE);
   };
 
   // Reset pagination on filter change
-  useEffect(() => { setLimit(PAGE); }, [query, cat, sec, loc]);
+  useEffect(() => { setLimit(PAGE); }, [query, cat, sec, loc, listingId]);
 
   const FilterSelect = ({
     label,
@@ -164,10 +172,23 @@ export default function VesselSearch() {
                 className="rounded-2xl border border-white/10 p-5"
                 style={{ background: "rgba(11,30,61,0.6)" }}
               >
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                   <FilterSelect label="Category" value={cat} set={setCat} opts={CATEGORY_LIST} placeholder="All Categories" />
                   <FilterSelect label="Sector" value={sec} set={setSec} opts={sectors} />
                   <FilterSelect label="Location" value={loc} set={setLoc} opts={locations} />
+                  <div className="relative">
+                    <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/40">Listing ID</label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={listingId}
+                        onChange={(e) => { setListingId(e.target.value); setLimit(PAGE); }}
+                        placeholder="AGM 1005"
+                        className="w-full rounded-xl border border-white/12 bg-white/6 px-4 py-3 text-sm text-white/85 outline-none transition focus:border-[#FFCC00]/60 focus:ring-2 focus:ring-[#FFCC00]/10"
+                        style={{ background: "rgba(11,30,61,0.6)" }}
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 {hasActiveFilter && (
@@ -218,11 +239,23 @@ export default function VesselSearch() {
                   <button onClick={() => setCat("")} className="ml-1"><X size={9} /></button>
                 </span>
               )}
+              {sec !== ALL && (
+                <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/70">
+                  {sec}
+                  <button onClick={() => setSec(ALL)} className="ml-1"><X size={9} /></button>
+                </span>
+              )}
               {loc !== ALL && (
                 <span className="flex items-center gap-1 rounded-full bg-white/10 px-3 py-1 text-[11px] font-bold text-white/70">
                   <MapPin size={10} />
                   {loc}
                   <button onClick={() => setLoc(ALL)} className="ml-1"><X size={9} /></button>
+                </span>
+              )}
+              {listingId && (
+                <span className="flex items-center gap-1 rounded-full bg-[#FFCC00]/15 px-3 py-1 text-[11px] font-bold text-[#FFCC00]">
+                  ID: {listingId}
+                  <button onClick={() => setListingId("")} className="ml-1"><X size={9} /></button>
                 </span>
               )}
             </div>

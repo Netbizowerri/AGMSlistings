@@ -1,17 +1,24 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { User } from "firebase/auth";
+import { Link } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
 import {
+  Anchor,
+  ArrowLeft,
   Download,
   Eye,
   EyeOff,
   LayoutDashboard,
   LogOut,
+  MapPin,
+  Menu,
   Pencil,
   Plus,
   RefreshCw,
   Search,
   Ship,
   Trash2,
+  X,
 } from "lucide-react";
 import { firebaseConfigured } from "../lib/firebaseConfig";
 import {
@@ -40,15 +47,17 @@ type View = "dashboard" | "vessels";
 
 const SPEC_LABELS = ["Built", "LOA", "Beam", "Draft", "Power / capacity", "Class"];
 
-/* WordPress admin palette */
-const WP = {
-  sidebar: "#1d2327",
-  sidebarHover: "#2c3338",
-  sidebarText: "#c3c4c7",
-  canvas: "#f0f0f1",
-  border: "#c3c4c7",
-  muted: "#646970",
-} as const;
+/* Shared class strings — the admin is fully dark, matching the public site's
+   marine palette. Every text element carries an explicit colour: the body's
+   light default (#f0f4ff) must never land on a light surface. */
+const inputCls =
+  "w-full rounded-lg border border-[#1B3465] bg-[#050F24] px-3 py-2 text-sm text-[#F0F4FF] placeholder:text-[#6B7FA6] transition-colors focus:border-[#FFCC00] focus:outline-none focus:ring-2 focus:ring-[#FFCC00]/25";
+const selectCls = `${inputCls} admin-select`;
+const ghostBtn =
+  "flex items-center gap-2 rounded-lg border border-[#1B3465] px-3 py-2 text-sm font-medium text-[#93A5C4] transition-colors hover:border-[#3A64C2] hover:bg-[#12294D] hover:text-[#F0F4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 disabled:opacity-60";
+const goldBtn =
+  "flex items-center gap-2 rounded-lg bg-[#FFCC00] px-3 py-2 text-sm font-semibold text-[#092E6D] transition-all hover:bg-[#E6B800] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050F24] active:scale-[0.98] disabled:opacity-60";
+const panelCls = "overflow-hidden rounded-xl border border-[#1B3465] bg-[#0B1E3D]";
 
 function emptyDraft(id: string, agmId: string): AdminVessel {
   return {
@@ -64,7 +73,29 @@ function emptyDraft(id: string, agmId: string): AdminVessel {
     image: "",
     summary: "",
     specs: SPEC_LABELS.map((label) => ({ label, value: "—" })),
+    details: "",
+    remarks: [],
+    particulars: [],
+    contact: "",
   };
+}
+
+function StatusBadge({ published }: { published: boolean }) {
+  return (
+    <span
+      className={
+        published
+          ? "shrink-0 rounded-md border border-[#4ADE80]/30 bg-[#4ADE80]/10 px-2 py-0.5 text-[11px] font-semibold text-[#4ADE80]"
+          : "shrink-0 rounded-md border border-[#FBBF24]/30 bg-[#FBBF24]/10 px-2 py-0.5 text-[11px] font-semibold text-[#FBBF24]"
+      }
+    >
+      {published ? "Live" : "Draft"}
+    </span>
+  );
+}
+
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded-lg bg-[#12294D] ${className ?? ""}`} />;
 }
 
 /* ------------------------------------------------------------------ gate */
@@ -74,14 +105,17 @@ export default function AdminLogin() {
 
   if (!firebaseConfigured) {
     return (
-      <div className="min-h-screen px-4 py-10" style={{ background: WP.canvas }}>
-        <div className="mx-auto max-w-lg rounded border bg-white p-6" style={{ borderColor: WP.border }}>
-          <h1 className="text-xl font-semibold text-[#092E6D]">Admin setup required</h1>
-          <p className="mt-3 text-sm" style={{ color: WP.muted }}>
+      <div className="flex min-h-dvh items-center justify-center bg-[#050F24] px-4 py-10">
+        <div className="w-full max-w-lg rounded-2xl border border-[#1B3465] bg-[#0B1E3D] p-6 sm:p-8">
+          <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFCC00]">
+            <Ship size={20} className="text-[#092E6D]" />
+          </div>
+          <h1 className="text-xl font-semibold text-[#F0F4FF]">Admin setup required</h1>
+          <p className="mt-3 text-sm leading-relaxed text-[#93A5C4]">
             Firebase environment variables are missing. Copy{" "}
-            <code className="rounded bg-neutral-200 px-1">.env.example</code> to{" "}
-            <code className="rounded bg-neutral-200 px-1">.env.local</code>, fill in the Web app
-            config, then restart the dev server.
+            <code className="rounded bg-[#050F24] px-1.5 py-0.5 text-[#FFCC00]">.env.example</code> to{" "}
+            <code className="rounded bg-[#050F24] px-1.5 py-0.5 text-[#FFCC00]">.env.local</code>, fill in
+            the Web app config, then restart the dev server.
           </p>
         </div>
       </div>
@@ -90,10 +124,9 @@ export default function AdminLogin() {
 
   if (checking) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: WP.canvas }}>
-        <p className="text-sm" style={{ color: WP.muted }}>
-          Checking session…
-        </p>
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-[#050F24]">
+        <div className="h-9 w-9 animate-spin rounded-full border-2 border-[#1B3465] border-t-[#FFCC00]" />
+        <p className="text-sm text-[#93A5C4]">Checking session…</p>
       </div>
     );
   }
@@ -185,6 +218,20 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     void refresh();
   }, [refresh]);
 
+  // Mobile drawer: lock background scroll and allow Esc to close.
+  useEffect(() => {
+    if (!navOpen) return;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setNavOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = "";
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [navOpen]);
+
   const stats = useMemo(() => {
     const byCategory = new Map<string, number>();
     let live = 0;
@@ -244,21 +291,27 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     { key: "vessels", label: "Vessels", icon: Ship, count: stats.total },
   ];
 
-  const sidebar = (
-    <div
-      className="flex h-full w-60 shrink-0 flex-col"
-      style={{ background: WP.sidebar, color: WP.sidebarText }}
-    >
-      <div className="flex items-center gap-2 px-4 py-4">
-        <Ship size={22} className="text-[#FFCC00]" />
-        <div className="leading-tight">
-          <p className="text-sm font-semibold text-white">AGMS Admin</p>
-          <p className="text-[11px] text-neutral-400">Vessel Listings</p>
+  const sidebarContent = (
+    <div className="flex h-full min-h-0 flex-col">
+      <div className="flex items-center gap-3 border-b border-[#1B3465] px-4 py-4">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#FFCC00] shadow-[0_0_18px_rgba(255,204,0,0.25)]">
+          <Ship size={18} className="text-[#092E6D]" />
         </div>
+        <div className="min-w-0 leading-tight">
+          <p className="text-sm font-semibold text-[#F0F4FF]">AGMS Admin</p>
+          <p className="truncate text-[11px] text-[#93A5C4]">Vessel listings console</p>
+        </div>
+        <button
+          onClick={() => setNavOpen(false)}
+          aria-label="Close menu"
+          className="ml-auto rounded-lg p-1.5 text-[#93A5C4] transition-colors hover:bg-[#12294D] hover:text-[#F0F4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 md:hidden"
+        >
+          <X size={18} />
+        </button>
       </div>
 
-      <nav className="flex-1 px-2">
-        <p className="px-2 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+      <nav className="flex-1 px-2 py-2">
+        <p className="px-3 pb-2 pt-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#6B7FA6]">
           Menu
         </p>
         {menu.map((m) => {
@@ -271,17 +324,17 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
                 setView(m.key);
                 setNavOpen(false);
               }}
-              className="flex w-full items-center gap-2 rounded px-2 py-2 text-left text-sm font-medium"
-              style={{
-                background: active ? WP.sidebarHover : "transparent",
-                color: active ? "#72aee6" : WP.sidebarText,
-                boxShadow: active ? "inset 3px 0 0 #72aee6" : "none",
-              }}
+              aria-current={active ? "page" : undefined}
+              className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 ${
+                active
+                  ? "bg-[#12294D] text-[#FFCC00] shadow-[inset_3px_0_0_#FFCC00]"
+                  : "text-[#93A5C4] hover:bg-[#12294D]/60 hover:text-[#F0F4FF]"
+              }`}
             >
-              <Icon size={16} />
+              <Icon size={17} />
               <span className="flex-1">{m.label}</span>
               {m.count !== undefined && (
-                <span className="rounded bg-neutral-700 px-1.5 text-[11px] text-neutral-200">
+                <span className="rounded-md bg-[#050F24] px-1.5 py-0.5 text-[11px] tabular-nums text-[#93A5C4]">
                   {m.count}
                 </span>
               )}
@@ -290,94 +343,114 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
         })}
       </nav>
 
-      <div className="border-t border-neutral-700 p-3">
-        <p className="truncate text-[11px] text-neutral-400" title={user.email ?? ""}>
-          Signed in as
-          <span className="block truncate font-medium text-neutral-200">{user.email}</span>
+      <div className="border-t border-[#1B3465] p-3">
+        <p className="truncate px-1 text-[11px] text-[#93A5C4]">Signed in as</p>
+        <p className="truncate px-1 pb-1 text-sm font-medium text-[#F0F4FF]" title={user.email ?? ""}>
+          {user.email}
         </p>
         <button
           onClick={async () => {
             if (!window.confirm("Sign out of the admin dashboard?")) return;
             await onSignOut();
           }}
-          className="mt-2 flex w-full items-center gap-2 rounded px-2 py-2 text-sm font-medium hover:bg-[#2c3338]"
-          style={{ color: WP.sidebarText }}
+          className="mt-1 flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-[#93A5C4] transition-colors hover:bg-[#F87171]/10 hover:text-[#F87171] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
         >
           <LogOut size={16} />
-          Sign Out
+          Sign out
         </button>
       </div>
     </div>
   );
 
   return (
-    <div className="flex min-h-screen" style={{ background: WP.canvas }}>
+    <div className="min-h-dvh bg-[#050F24] text-[#F0F4FF]">
       {/* Desktop sidebar */}
-      <aside className="hidden md:block">
-        <div className="fixed inset-y-0">{sidebar}</div>
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-64 flex-col border-r border-[#1B3465] bg-[#0B1E3D] md:flex">
+        {sidebarContent}
       </aside>
 
       {/* Mobile drawer */}
-      {navOpen && (
-        <div className="fixed inset-0 z-40 md:hidden">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setNavOpen(false)} />
-          <div className="absolute inset-y-0 left-0">{sidebar}</div>
-        </div>
-      )}
+      <AnimatePresence>
+        {navOpen && (
+          <motion.div
+            key="drawer"
+            className="fixed inset-0 z-50 md:hidden"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            <div
+              className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
+              onClick={() => setNavOpen(false)}
+            />
+            <motion.div
+              role="dialog"
+              aria-label="Navigation"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 320, damping: 34 }}
+              className="absolute inset-y-0 left-0 flex w-64 max-w-[85vw] flex-col border-r border-[#1B3465] bg-[#0B1E3D] shadow-[24px_0_60px_rgba(0,0,0,0.5)]"
+            >
+              {sidebarContent}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      <div className="min-w-0 flex-1">
-        <header
-          className="sticky top-0 z-30 flex items-center gap-3 border-b bg-white px-4 py-2.5"
-          style={{ borderColor: WP.border }}
-        >
+      {/* Content */}
+      <div className="flex min-h-dvh flex-col md:pl-64">
+        <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#1B3465] bg-[#050F24]/90 px-4 py-3 backdrop-blur md:px-6">
           <button
             onClick={() => setNavOpen(true)}
-            className="rounded border px-2 py-1 text-sm md:hidden"
-            style={{ borderColor: WP.border }}
+            className="rounded-lg border border-[#1B3465] p-2 text-[#93A5C4] transition-colors hover:bg-[#12294D] hover:text-[#F0F4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 md:hidden"
             aria-label="Open menu"
           >
-            ☰
+            <Menu size={18} />
           </button>
-          <h1 className="text-sm font-semibold text-[#1d2327]">
-            {view === "dashboard" ? "Dashboard" : "Vessels"}
-          </h1>
+          <div className="min-w-0">
+            <h1 className="truncate text-sm font-semibold text-[#F0F4FF] md:text-base">
+              {view === "dashboard" ? "Dashboard" : "Vessel listings"}
+            </h1>
+            <p className="hidden text-[11px] text-[#93A5C4] sm:block">
+              {view === "dashboard"
+                ? "AGMS brokerage console"
+                : `${stats.total} listings in the catalogue`}
+            </p>
+          </div>
           <div className="ml-auto flex items-center gap-2">
             <button
               onClick={() => void refresh()}
-              className="flex items-center gap-1 rounded border px-2.5 py-1.5 text-sm"
-              style={{ borderColor: WP.border, color: WP.muted }}
+              aria-label="Refresh listings"
+              className={ghostBtn}
             >
-              <RefreshCw size={14} />
-              Refresh
+              <RefreshCw size={15} />
+              <span className="hidden sm:inline">Refresh</span>
             </button>
-            <button
-              onClick={openNew}
-              className="flex items-center gap-1 rounded bg-[#092E6D] px-3 py-1.5 text-sm font-medium text-white"
-            >
-              <Plus size={14} />
-              Add New
+            <button onClick={openNew} aria-label="Add new vessel" className={goldBtn}>
+              <Plus size={15} />
+              <span className="hidden sm:inline">Add New</span>
             </button>
           </div>
         </header>
 
-        <main className="p-4">
+        <main className="flex-1 p-4 sm:p-6">
           {status && (
             <div
-              className="mb-4 rounded border-l-4 px-3 py-2 text-sm"
-              style={{
-                background: status.kind === "err" ? "#fcf0f1" : "#edfaef",
-                borderLeftColor: status.kind === "err" ? "#d63638" : "#00a32a",
-                color: status.kind === "err" ? "#8a2424" : "#1a4d1f",
-              }}
+              role={status.kind === "err" ? "alert" : "status"}
+              className={`mb-4 rounded-lg border-l-4 px-4 py-3 text-sm ${
+                status.kind === "err"
+                  ? "border-[#F87171] bg-[#F87171]/10 text-[#FCA5A5]"
+                  : "border-[#4ADE80] bg-[#4ADE80]/10 text-[#86EFAC]"
+              }`}
             >
               {status.text}
             </div>
           )}
 
           {loading ? (
-            <p className="text-sm" style={{ color: WP.muted }}>
-              Loading…
-            </p>
+            <DashboardSkeleton />
           ) : view === "dashboard" ? (
             <DashboardHome stats={stats} vessels={all} onOpenVessels={() => setView("vessels")} />
           ) : (
@@ -432,6 +505,34 @@ type Stats = {
   categories: [string, number][];
 };
 
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-4" aria-hidden="true">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className={`${panelCls} p-4`}>
+            <Skeleton className="h-10 w-10 rounded-lg" />
+            <Skeleton className="mt-4 h-6 w-16" />
+            <Skeleton className="mt-2 h-3 w-24" />
+          </div>
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2">
+        {[0, 1].map((i) => (
+          <div key={i} className={`${panelCls} p-4`}>
+            <Skeleton className="h-4 w-32" />
+            <div className="mt-4 space-y-3">
+              {[0, 1, 2, 3].map((j) => (
+                <Skeleton key={j} className="h-8 w-full" />
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Card({
   label,
   value,
@@ -442,21 +543,12 @@ function Card({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded border bg-white p-4" style={{ borderColor: WP.border }}>
-      <div className="flex items-center gap-3">
-        <div
-          className="flex h-9 w-9 items-center justify-center rounded"
-          style={{ background: "#f0f6fc", color: "#2271b1" }}
-        >
-          {icon}
-        </div>
-        <div>
-          <p className="text-2xl font-semibold leading-none text-[#1d2327]">{value}</p>
-          <p className="mt-1 text-xs" style={{ color: WP.muted }}>
-            {label}
-          </p>
-        </div>
+    <div className={`${panelCls} p-4 transition-colors hover:border-[#3A64C2]/60`}>
+      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#3A64C2]/15 text-[#72AEE6]">
+        {icon}
       </div>
+      <p className="mt-4 text-2xl font-semibold tabular-nums leading-none text-[#F0F4FF]">{value}</p>
+      <p className="mt-1.5 text-xs text-[#93A5C4]">{label}</p>
     </div>
   );
 }
@@ -477,104 +569,90 @@ function DashboardHome({
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <Card label="Total Vessels" value={stats.total} icon={<Ship size={18} />} />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <Card label="Total vessels" value={stats.total} icon={<Ship size={18} />} />
         <Card label="Categories" value={stats.categoryCount} icon={<LayoutDashboard size={18} />} />
-        <Card label="Live Listings" value={stats.live} icon={<Eye size={18} />} />
+        <Card label="Live listings" value={stats.live} icon={<Eye size={18} />} />
         <Card label="Drafts" value={stats.drafts} icon={<EyeOff size={18} />} />
-        <Card label="Locations" value={stats.locations} icon={<Search size={18} />} />
-        <Card label="Sectors" value={stats.sectors} icon={<Download size={18} />} />
+        <Card label="Locations" value={stats.locations} icon={<MapPin size={18} />} />
+        <Card label="Sectors" value={stats.sectors} icon={<Anchor size={18} />} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Panel title="Categories" action={<button onClick={onOpenVessels} className="text-xs text-[#2271b1] hover:underline">
-          Manage vessels
-        </button>}>
-          {stats.categories.length === 0 ? (
-            <Empty>No listings yet.</Empty>
-          ) : (
-            <ul className="space-y-2">
-              {stats.categories.map(([name, n]) => (
-                <li key={name}>
-                  <div className="flex justify-between text-sm">
-                    <span className="truncate">{name}</span>
-                    <span style={{ color: WP.muted }}>{n}</span>
-                  </div>
-                  <div className="mt-1 h-1.5 rounded bg-neutral-200">
-                    <div
-                      className="h-1.5 rounded bg-[#2271b1]"
-                      style={{ width: `${(n / max) * 100}%` }}
-                    />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+        <section className={panelCls}>
+          <header className="flex items-center justify-between border-b border-[#1B3465] px-4 py-3">
+            <h2 className="text-sm font-semibold text-[#F0F4FF]">Categories</h2>
+            <button
+              onClick={onOpenVessels}
+              className="text-xs font-medium text-[#72AEE6] transition-colors hover:text-[#FFCC00] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
+            >
+              Manage vessels
+            </button>
+          </header>
+          <div className="p-4">
+            {stats.categories.length === 0 ? (
+              <Empty>No listings yet.</Empty>
+            ) : (
+              <ul className="space-y-3">
+                {stats.categories.map(([name, n]) => (
+                  <li key={name}>
+                    <div className="flex justify-between text-sm">
+                      <span className="truncate text-[#F0F4FF]">{name}</span>
+                      <span className="ml-3 shrink-0 tabular-nums text-[#93A5C4]">{n}</span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-[#050F24]">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-[#3A64C2] to-[#FFCC00] transition-all duration-500"
+                        style={{ width: `${(n / max) * 100}%` }}
+                      />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
 
-        <Panel title="Latest Listings">
-          {recent.length === 0 ? (
-            <Empty>No listings yet.</Empty>
-          ) : (
-            <ul className="divide-y" style={{ borderColor: WP.border }}>
-              {recent.map((v) => (
-                <li key={v.id} className="flex items-center gap-3 py-2">
-                  <img src={v.image} alt="" className="h-10 w-14 rounded object-cover" loading="lazy" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{v.title}</p>
-                    <p className="truncate text-xs" style={{ color: WP.muted }}>
-                      {v.id} · {v.agmId} · {v.category}
-                    </p>
-                  </div>
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[11px] font-medium"
-                    style={
-                      v.published
-                        ? { background: "#edfaef", color: "#1a4d1f" }
-                        : { background: "#fcf9e8", color: "#7d5c00" }
-                    }
+        <section className={panelCls}>
+          <header className="border-b border-[#1B3465] px-4 py-3">
+            <h2 className="text-sm font-semibold text-[#F0F4FF]">Latest listings</h2>
+          </header>
+          <div className="p-4">
+            {recent.length === 0 ? (
+              <Empty>No listings yet.</Empty>
+            ) : (
+              <ul className="space-y-1">
+                {recent.map((v) => (
+                  <li
+                    key={v.id}
+                    className="flex items-center gap-3 rounded-lg px-2 py-2 transition-colors hover:bg-[#12294D]/60"
                   >
-                    {v.published ? "Live" : "Draft"}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+                    <img
+                      src={v.image}
+                      alt=""
+                      className="h-10 w-14 shrink-0 rounded-md object-cover"
+                      loading="lazy"
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium text-[#F0F4FF]">{v.title}</p>
+                      <p className="truncate text-xs tabular-nums text-[#93A5C4]">
+                        {v.id} · {v.agmId} · {v.category}
+                      </p>
+                    </div>
+                    <StatusBadge published={v.published} />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );
 }
 
-function Panel({
-  title,
-  action,
-  children,
-}: {
-  title: string;
-  action?: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <section className="rounded border bg-white" style={{ borderColor: WP.border }}>
-      <header
-        className="flex items-center justify-between border-b px-4 py-2.5"
-        style={{ borderColor: WP.border }}
-      >
-        <h2 className="text-sm font-semibold text-[#1d2327]">{title}</h2>
-        {action}
-      </header>
-      <div className="p-4">{children}</div>
-    </section>
-  );
-}
-
 function Empty({ children }: { children: ReactNode }) {
-  return (
-    <p className="py-4 text-center text-sm" style={{ color: WP.muted }}>
-      {children}
-    </p>
-  );
+  return <p className="py-6 text-center text-sm text-[#93A5C4]">{children}</p>;
 }
 
 /* --------------------------------------------------------------- vessels */
@@ -608,25 +686,69 @@ function VesselsView({
   onRefresh: () => Promise<void>;
   onError: (t: string) => void;
 }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const toggle = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+
+  const allVisibleSelected = visible.length > 0 && visible.every((v) => selected.has(v.id));
+  const someVisibleSelected = visible.some((v) => selected.has(v.id));
+
+  const toggleAll = () =>
+    setSelected(allVisibleSelected ? new Set() : new Set(visible.map((v) => v.id)));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someVisibleSelected && !allVisibleSelected;
+    }
+  }, [someVisibleSelected, allVisibleSelected]);
+
+  const bulkDelete = async () => {
+    const ids = [...selected];
+    if (ids.length === 0) return;
+    const label = ids.length === 1 ? "1 listing" : `${ids.length} listings`;
+    if (!window.confirm(`Delete ${label}? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await Promise.all(ids.map((id) => deleteVessel(id)));
+      setSelected(new Set());
+      await onRefresh();
+    } catch (err) {
+      onError(readableFirestoreError(err));
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
-    <div className="space-y-3">
-      <div className="rounded border bg-white p-3" style={{ borderColor: WP.border }}>
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-2.5 text-neutral-400" />
+    <div className="space-y-4">
+      <div className={`${panelCls} p-3 sm:p-4`}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="relative w-full sm:w-64">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#6B7FA6]"
+            />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title, WBS, location…"
-              className="w-64 rounded border py-1.5 pl-8 pr-3 text-sm"
-              style={{ borderColor: WP.border }}
+              placeholder="Search title, ID, location…"
+              aria-label="Search listings"
+              className={`${inputCls} pl-9`}
             />
           </div>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
-            className="rounded border px-2 py-1.5 text-sm"
-            style={{ borderColor: WP.border }}
+            aria-label="Filter by category"
+            className={`${selectCls} sm:w-auto`}
           >
             <option value="">All categories ({total})</option>
             {categories.map(([c, n]) => (
@@ -635,113 +757,204 @@ function VesselsView({
               </option>
             ))}
           </select>
-          <button
-            onClick={onSeed}
-            disabled={seeding}
-            className="flex items-center gap-1 rounded border px-2.5 py-1.5 text-sm disabled:opacity-60"
-            style={{ borderColor: WP.border, color: WP.muted }}
-          >
-            <Download size={14} />
-            {seeding ? "Importing…" : "Import missing"}
-          </button>
-          <button
-            onClick={onAdd}
-            className="flex items-center gap-1 rounded bg-[#092E6D] px-3 py-1.5 text-sm font-medium text-white"
-          >
-            <Plus size={14} />
-            Add New
-          </button>
+          <div className="flex gap-2 sm:ml-auto">
+            <button onClick={onSeed} disabled={seeding} className={`${ghostBtn} flex-1 justify-center sm:flex-none`}>
+              <Download size={15} />
+              {seeding ? "Importing…" : "Import missing"}
+            </button>
+            <button onClick={onAdd} className={`${goldBtn} flex-1 justify-center sm:flex-none`}>
+              <Plus size={15} />
+              Add New
+            </button>
+          </div>
         </div>
-        <p className="mt-2 text-xs" style={{ color: WP.muted }}>
-          {visible.length} of {total} listings
+        <p className="mt-3 text-xs text-[#93A5C4]">
+          <span className="tabular-nums">{visible.length}</span> of{" "}
+          <span className="tabular-nums">{total}</span> listings
         </p>
       </div>
 
-      <div className="overflow-x-auto rounded border bg-white" style={{ borderColor: WP.border }}>
-        <table className="w-full text-sm">
-          <thead>
-            <tr style={{ background: "#f6f7f7" }}>
-              {["Image", "Title", "ID / WBS", "Category", "Location", "Price", "Status", "Actions"].map(
-                (h) => (
-                  <th
-                    key={h}
-                    className="border-b px-3 py-2 text-left font-semibold"
-                    style={{ borderColor: WP.border, color: "#1d2327" }}
-                  >
-                    {h}
-                  </th>
-                ),
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {visible.map((v) => (
-              <tr key={v.id} className="hover:bg-[#f6f7f7]">
-                <td className="border-b px-3 py-2" style={{ borderColor: WP.border }}>
-                  <img src={v.image} alt="" className="h-10 w-14 rounded object-cover" loading="lazy" />
-                </td>
-                <td className="max-w-xs border-b px-3 py-2" style={{ borderColor: WP.border }}>
-                  <span className="line-clamp-2 font-medium">{v.title}</span>
-                </td>
-                <td className="whitespace-nowrap border-b px-3 py-2 text-xs" style={{ borderColor: WP.border, color: WP.muted }}>
-                  {v.id}
-                  <br />
-                  {v.agmId}
-                </td>
-                <td className="border-b px-3 py-2 text-xs" style={{ borderColor: WP.border }}>
-                  {v.category}
-                </td>
-                <td className="border-b px-3 py-2 text-xs" style={{ borderColor: WP.border }}>
-                  {v.location}
-                </td>
-                <td className="whitespace-nowrap border-b px-3 py-2 text-xs" style={{ borderColor: WP.border }}>
-                  {v.price}
-                </td>
-                <td className="border-b px-3 py-2" style={{ borderColor: WP.border }}>
-                  <span
-                    className="rounded px-1.5 py-0.5 text-[11px] font-medium"
-                    style={
-                      v.published
-                        ? { background: "#edfaef", color: "#1a4d1f" }
-                        : { background: "#fcf9e8", color: "#7d5c00" }
-                    }
-                  >
-                    {v.published ? "Live" : "Draft"}
-                  </span>
-                </td>
-                <td className="border-b px-3 py-2" style={{ borderColor: WP.border }}>
-                  <RowActions v={v} onEdit={onEdit} onRefresh={onRefresh} onError={onError} />
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {visible.length === 0 && (
-          <div className="p-8 text-center">
-            <p className="font-medium text-[#092E6D]">No listings found</p>
-            <p className="mt-1 text-sm" style={{ color: WP.muted }}>
-              {total === 0
-                ? "Import the existing catalogue, or add a listing manually."
-                : "Try a different search or category."}
-            </p>
-            {total === 0 && (
-              <div className="mt-4 flex justify-center gap-2">
+      {visible.length === 0 ? (
+        <div className={`${panelCls} px-6 py-12 text-center`}>
+          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-[#3A64C2]/15 text-[#72AEE6]">
+            <Search size={22} />
+          </div>
+          <p className="mt-4 font-medium text-[#F0F4FF]">No listings found</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-[#93A5C4]">
+            {total === 0
+              ? "Import the existing catalogue, or add a listing manually."
+              : "Try a different search term or category."}
+          </p>
+          {total === 0 && (
+            <div className="mt-5 flex flex-wrap justify-center gap-2">
+              <button onClick={onSeed} disabled={seeding} className={goldBtn}>
+                {seeding ? "Importing…" : "Import existing catalogue"}
+              </button>
+              <button onClick={onAdd} className={ghostBtn}>
+                Add vessel
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          {/* Bulk selection toolbar */}
+          {selected.size > 0 && (
+            <div className="flex flex-wrap items-center gap-3 rounded-xl border border-[#FFCC00]/30 bg-[#12294D] px-4 py-3">
+              <span className="text-sm font-semibold text-[#F0F4FF]">
+                <span className="tabular-nums">{selected.size}</span> selected
+              </span>
+              <div className="flex flex-wrap gap-1">
                 <button
-                  onClick={onSeed}
-                  disabled={seeding}
-                  className="rounded bg-[#092E6D] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
+                  onClick={() => setSelected(new Set(visible.map((v) => v.id)))}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-[#93A5C4] transition-colors hover:bg-[#0B1E3D] hover:text-[#F0F4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
                 >
-                  {seeding ? "Importing…" : "Import existing catalogue"}
+                  Select all visible
                 </button>
-                <button onClick={onAdd} className="rounded border px-4 py-2 text-sm" style={{ borderColor: WP.border }}>
-                  Add vessel
+                <button
+                  onClick={() => setSelected(new Set())}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-[#93A5C4] transition-colors hover:bg-[#0B1E3D] hover:text-[#F0F4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
+                >
+                  Clear
                 </button>
               </div>
-            )}
+              <button
+                onClick={bulkDelete}
+                disabled={deleting}
+                className="ml-auto flex items-center gap-2 rounded-lg border border-[#F87171]/50 bg-[#F87171]/10 px-3 py-2 text-sm font-semibold text-[#F87171] transition-colors hover:bg-[#F87171]/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#050F24] disabled:opacity-60"
+              >
+                <Trash2 size={14} />
+                {deleting ? "Deleting…" : `Delete (${selected.size})`}
+              </button>
+            </div>
+          )}
+
+          {/* Desktop table */}
+          <div className={`hidden md:block ${panelCls}`}>
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-[#1B3465] bg-[#050F24]/60">
+                  <th scope="col" className="w-12 px-4 py-3">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      checked={allVisibleSelected}
+                      onChange={toggleAll}
+                      aria-label="Select all visible listings"
+                      className="h-4 w-4 shrink-0 accent-[#FFCC00]"
+                    />
+                  </th>
+                  {[
+                    "Image",
+                    "Title",
+                    "ID / WBS",
+                    "Category",
+                    "Location",
+                    "Price",
+                    "Status",
+                    "Actions",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      scope="col"
+                      className="px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wide text-[#93A5C4]"
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+{visible.map((v) => (
+                <tr
+                  key={v.id}
+                  className={`border-b border-[#1B3465]/60 transition-colors last:border-0 hover:bg-[#12294D]/60 ${
+                    selected.has(v.id) ? "bg-[#12294D]/60" : ""
+                  }`}
+                >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(v.id)}
+                      onChange={() => toggle(v.id)}
+                      aria-label={`Select ${v.title}`}
+                      className="h-4 w-4 shrink-0 accent-[#FFCC00]"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                      <img
+                        src={v.image}
+                        alt=""
+                        className="h-10 w-14 rounded-md object-cover"
+                        loading="lazy"
+                      />
+                    </td>
+                    <td className="max-w-xs px-4 py-3">
+                      <span className="line-clamp-2 font-medium text-[#F0F4FF]">{v.title}</span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs tabular-nums text-[#93A5C4]">
+                      {v.id}
+                      <br />
+                      {v.agmId}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-[#93A5C4]">{v.category}</td>
+                    <td className="px-4 py-3 text-xs text-[#93A5C4]">{v.location}</td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs font-semibold text-[#FFCC00]">
+                      {v.price}
+                    </td>
+                    <td className="px-4 py-3">
+                      <StatusBadge published={v.published} />
+                    </td>
+                    <td className="px-4 py-3">
+                      <RowActions v={v} onEdit={onEdit} onRefresh={onRefresh} onError={onError} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+
+          {/* Mobile cards */}
+          <ul className={`divide-y divide-[#1B3465] md:hidden ${panelCls}`}>
+            {visible.map((v) => (
+              <li
+                key={v.id}
+                className={`flex gap-3 p-3 sm:p-4 ${selected.has(v.id) ? "bg-[#12294D]/60" : ""}`}
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.has(v.id)}
+                  onChange={() => toggle(v.id)}
+                  aria-label={`Select ${v.title}`}
+                  className="mt-1 h-4 w-4 shrink-0 accent-[#FFCC00]"
+                />
+                <img
+                  src={v.image}
+                  alt=""
+                  className="h-16 w-20 shrink-0 rounded-lg object-cover sm:h-20 sm:w-28"
+                  loading="lazy"
+                />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="line-clamp-2 text-sm font-medium text-[#F0F4FF]">{v.title}</p>
+                    <StatusBadge published={v.published} />
+                  </div>
+                  <p className="mt-1 truncate text-xs tabular-nums text-[#93A5C4]">
+                    {v.id} · {v.agmId}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-[#93A5C4]">
+                    {v.category} · {v.location}
+                  </p>
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <span className="text-sm font-semibold text-[#FFCC00]">{v.price}</span>
+                    <RowActions v={v} onEdit={onEdit} onRefresh={onRefresh} onError={onError} />
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
     </div>
   );
 }
@@ -757,17 +970,26 @@ function RowActions({
   onRefresh: () => Promise<void>;
   onError: (t: string) => void;
 }) {
-  const iconBtn =
-    "rounded border p-1.5 text-[#646970] hover:bg-[#f0f0f1] hover:text-[#1d2327]";
+  const base =
+    "rounded-lg border border-[#1B3465] p-2 text-[#93A5C4] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50";
   return (
-    <div className="flex gap-1">
-      <button className={iconBtn} style={{ borderColor: WP.border }} onClick={() => onEdit(v)} title="Edit">
+    <div className="flex shrink-0 gap-1.5">
+      <button
+        className={`${base} hover:border-[#3A64C2] hover:bg-[#12294D] hover:text-[#72AEE6]`}
+        onClick={() => onEdit(v)}
+        title="Edit"
+        aria-label={`Edit ${v.title}`}
+      >
         <Pencil size={14} />
       </button>
       <button
-        className={iconBtn}
-        style={{ borderColor: WP.border }}
+        className={`${base} ${
+          v.published
+            ? "hover:border-[#FBBF24]/50 hover:bg-[#FBBF24]/10 hover:text-[#FBBF24]"
+            : "hover:border-[#4ADE80]/50 hover:bg-[#4ADE80]/10 hover:text-[#4ADE80]"
+        }`}
         title={v.published ? "Unpublish" : "Publish"}
+        aria-label={`${v.published ? "Unpublish" : "Publish"} ${v.title}`}
         onClick={async () => {
           try {
             await setVesselPublished(v.id, !v.published);
@@ -780,9 +1002,9 @@ function RowActions({
         {v.published ? <EyeOff size={14} /> : <Eye size={14} />}
       </button>
       <button
-        className="rounded border p-1.5 text-[#d63638] hover:bg-[#fcf0f1]"
-        style={{ borderColor: WP.border }}
+        className={`${base} hover:border-[#F87171]/50 hover:bg-[#F87171]/10 hover:text-[#F87171]`}
         title="Delete"
+        aria-label={`Delete ${v.title}`}
         onClick={async () => {
           if (!window.confirm(`Delete "${v.title}"? This cannot be undone.`)) return;
           try {
@@ -818,6 +1040,9 @@ function VesselForm({
 }) {
   const [draft, setDraft] = useState<AdminVessel>(vessel);
   const [busy, setBusy] = useState(false);
+  // Remarks are edited as free text (one per line) so Enter behaves normally,
+  // then split into an array on save.
+  const [remarksText, setRemarksText] = useState((vessel.remarks ?? []).join("\n"));
 
   const set = <K extends keyof AdminVessel>(key: K, value: AdminVessel[K]) =>
     setDraft((d) => ({ ...d, [key]: value }));
@@ -825,87 +1050,193 @@ function VesselForm({
   const setSpec = (i: number, value: string) =>
     setDraft((d) => ({ ...d, specs: d.specs.map((s, idx) => (idx === i ? { ...s, value } : s)) }));
 
+  const setParticular = (i: number, key: "label" | "value", value: string) =>
+    setDraft((d) => ({
+      ...d,
+      particulars: (d.particulars ?? []).map((p, idx) =>
+        idx === i ? { ...p, [key]: value } : p,
+      ),
+    }));
+
+  const addParticular = () =>
+    setDraft((d) => ({ ...d, particulars: [...(d.particulars ?? []), { label: "", value: "" }] }));
+
+  const removeParticular = (i: number) =>
+    setDraft((d) => ({ ...d, particulars: (d.particulars ?? []).filter((_, idx) => idx !== i) }));
+
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto p-4" style={{ background: "rgba(0,0,0,.5)" }}>
-      <div className="mx-auto my-6 max-w-3xl rounded border bg-white shadow-lg" style={{ borderColor: WP.border }}>
-        <header
-          className="flex items-center justify-between border-b px-4 py-3"
-          style={{ borderColor: WP.border }}
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm">
+      <div className="flex min-h-full items-end justify-center sm:items-center sm:p-4">
+        <motion.div
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 30 }}
+          role="dialog"
+          aria-modal="true"
+          aria-label={draft.title ? `Edit vessel ${draft.agmId}` : `Add vessel ${draft.agmId}`}
+          className="flex w-full max-w-3xl flex-col border border-[#1B3465] bg-[#0B1E3D] shadow-[0_32px_80px_rgba(0,0,0,0.6)] sm:rounded-2xl"
         >
-          <h2 className="text-sm font-semibold">
-            {draft.title ? `Edit Vessel — ${draft.agmId}` : `Add Vessel — ${draft.agmId}`}
-          </h2>
-          <button onClick={onClose} className="text-xs" style={{ color: WP.muted }}>
-            Close
-          </button>
-        </header>
+          <header className="flex items-center justify-between border-b border-[#1B3465] px-4 py-3 sm:px-6">
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-[#6B7FA6]">
+                {draft.title ? "Edit vessel" : "New vessel"}
+              </p>
+              <h2 className="truncate text-sm font-semibold text-[#F0F4FF]">{draft.agmId}</h2>
+            </div>
+            <button
+              onClick={onClose}
+              aria-label="Close form"
+              className="rounded-lg p-2 text-[#93A5C4] transition-colors hover:bg-[#12294D] hover:text-[#F0F4FF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
+            >
+              <X size={18} />
+            </button>
+          </header>
 
-        <div className="grid gap-3 p-4 sm:grid-cols-2">
-          <Field label="Title" wide value={draft.title} onChange={(v) => set("title", v)} />
-          <Field label="Category">
-            <select
-              value={draft.category}
-              onChange={(e) => set("category", e.target.value)}
-              className="mt-1 w-full rounded border px-2 py-1.5"
-              style={{ borderColor: WP.border }}
-            >
-              {categories.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Sector">
-            <select
-              value={draft.sector}
-              onChange={(e) => set("sector", e.target.value)}
-              className="mt-1 w-full rounded border px-2 py-1.5"
-              style={{ borderColor: WP.border }}
-            >
-              {["For sale", "For charter", "For sale or charter"].map((s) => (
-                <option key={s}>{s}</option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Location" value={draft.location} onChange={(v) => set("location", v)} />
-          <Field label="Price" value={draft.price} onChange={(v) => set("price", v)} />
-          <Field label="Image URL" wide value={draft.image} onChange={(v) => set("image", v)} />
-          <Field label="Summary" wide value={draft.summary} onChange={(v) => set("summary", v)} />
-          <Field label="Description" wide value={draft.description} onChange={(v) => set("description", v)} />
-          {draft.specs.map((s, i) => (
-            <Field key={s.label} label={s.label} value={s.value} onChange={(v) => setSpec(i, v)} />
-          ))}
-          <label className="flex items-center gap-2 text-sm font-medium sm:col-span-2">
-            <input
-              type="checkbox"
-              checked={draft.published}
-              onChange={(e) => set("published", e.target.checked)}
+          <div className="grid gap-3 p-4 sm:grid-cols-2 sm:p-6">
+            <Field label="Title" wide value={draft.title} onChange={(v) => set("title", v)} />
+            <Field label="Category">
+              <select
+                value={draft.category}
+                onChange={(e) => set("category", e.target.value)}
+                className={selectCls}
+              >
+                {categories.map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Sector">
+              <select
+                value={draft.sector}
+                onChange={(e) => set("sector", e.target.value)}
+                className={selectCls}
+              >
+                {["For sale", "For charter", "For sale or charter"].map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </Field>
+            <Field label="Location" value={draft.location} onChange={(v) => set("location", v)} />
+            <Field label="Price" value={draft.price} onChange={(v) => set("price", v)} />
+            <Field label="Image URL" wide value={draft.image} onChange={(v) => set("image", v)} />
+            <Field label="Summary" wide value={draft.summary} onChange={(v) => set("summary", v)} />
+            <Field
+              label="Description"
+              wide
+              value={draft.description}
+              onChange={(v) => set("description", v)}
             />
-            Published (visible on the public site)
-          </label>
-        </div>
+            {draft.specs.map((s, i) => (
+              <Field key={s.label} label={s.label} value={s.value} onChange={(v) => setSpec(i, v)} />
+            ))}
 
-        <footer className="flex gap-2 border-t px-4 py-3" style={{ borderColor: WP.border }}>
-          <button
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await save(draft);
-                await onSaved();
-              } catch (err) {
-                onError(readableFirestoreError(err));
-              } finally {
-                setBusy(false);
-              }
-            }}
-            className="rounded bg-[#092E6D] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            {busy ? "Saving…" : "Save Vessel"}
-          </button>
-          <button onClick={onClose} className="rounded border px-4 py-2 text-sm" style={{ borderColor: WP.border }}>
-            Cancel
-          </button>
-        </footer>
+            <div className="rounded-lg border border-[#1B3465] bg-[#050F24] p-3 sm:col-span-2">
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-sm font-medium text-[#93A5C4]">Additional particulars</span>
+                <button
+                  type="button"
+                  onClick={addParticular}
+                  className="flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-[#FFCC00] transition-colors hover:bg-[#12294D] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
+                >
+                  <Plus size={13} />
+                  Add row
+                </button>
+              </div>
+              {(draft.particulars ?? []).length === 0 ? (
+                <p className="text-xs text-[#6B7FA6]">
+                  None yet. Add a row for tonnage, builder, flag, cargo tanks, hull, main engine, etc.
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {(draft.particulars ?? []).map((p, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        value={p.label}
+                        onChange={(e) => setParticular(i, "label", e.target.value)}
+                        placeholder="Label (e.g. Gross Tonnage)"
+                        className={inputCls}
+                      />
+                      <input
+                        value={p.value}
+                        onChange={(e) => setParticular(i, "value", e.target.value)}
+                        placeholder="Value (e.g. 8,560)"
+                        className={inputCls}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeParticular(i)}
+                        aria-label={`Remove ${p.label || "particular"}`}
+                        className="shrink-0 rounded-lg border border-[#1B3465] p-2 text-[#93A5C4] transition-colors hover:border-[#F87171] hover:text-[#F87171] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Field label="Full description" wide>
+              <textarea
+                rows={4}
+                value={draft.details ?? ""}
+                onChange={(e) => set("details", e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Remarks (one per line)" wide>
+              <textarea
+                rows={3}
+                value={remarksText}
+                onChange={(e) => setRemarksText(e.target.value)}
+                className={inputCls}
+              />
+            </Field>
+            <Field label="Contact (optional)" value={draft.contact ?? ""} onChange={(v) => set("contact", v)} />
+
+            <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-[#1B3465] bg-[#050F24] px-4 py-3 text-sm font-medium text-[#F0F4FF] sm:col-span-2">
+              <input
+                type="checkbox"
+                checked={draft.published}
+                onChange={(e) => set("published", e.target.checked)}
+                className="h-4 w-4 shrink-0 accent-[#FFCC00]"
+              />
+              Published (visible on the public site)
+            </label>
+          </div>
+
+          <footer className="sticky bottom-0 flex gap-2 border-t border-[#1B3465] bg-[#0B1E3D] px-4 py-3 sm:px-6">
+            <button
+              disabled={busy}
+              onClick={async () => {
+                setBusy(true);
+                try {
+                  await save({
+                    ...draft,
+                    remarks: remarksText
+                      .split("\n")
+                      .map((line) => line.trim())
+                      .filter(Boolean),
+                    particulars: (draft.particulars ?? [])
+                      .map((p) => ({ label: p.label.trim(), value: p.value.trim() }))
+                      .filter((p) => p.label || p.value),
+                  });
+                  await onSaved();
+                } catch (err) {
+                  onError(readableFirestoreError(err));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+              className={`${goldBtn} flex-1 justify-center sm:flex-none`}
+            >
+              {busy ? "Saving…" : "Save Vessel"}
+            </button>
+            <button onClick={onClose} className={`${ghostBtn} flex-1 justify-center sm:flex-none`}>
+              Cancel
+            </button>
+          </footer>
+        </motion.div>
       </div>
     </div>
   );
@@ -926,13 +1257,12 @@ function Field({
 }) {
   return (
     <label className={`block text-sm font-medium ${wide ? "sm:col-span-2" : ""}`}>
-      {label}
+      <span className="mb-1.5 block text-[#93A5C4]">{label}</span>
       {children ?? (
         <input
           value={value ?? ""}
           onChange={(e) => onChange?.(e.target.value)}
-          className="mt-1 w-full rounded border px-2 py-1.5"
-          style={{ borderColor: WP.border }}
+          className={inputCls}
         />
       )}
     </label>
@@ -947,18 +1277,16 @@ function SignIn() {
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<Status>(null);
 
-  const input = "mt-1 w-full rounded border px-3 py-2";
-
   return (
-    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: WP.sidebar }}>
-      <div className="w-full max-w-sm rounded border bg-white p-6" style={{ borderColor: WP.border }}>
-        <div className="mb-5 flex items-center gap-2">
-          <Ship size={24} className="text-[#092E6D]" />
-          <div>
-            <h1 className="text-base font-semibold text-[#092E6D]">AGMS Admin</h1>
-            <p className="text-xs" style={{ color: WP.muted }}>
-              Sign in to manage vessel listings
-            </p>
+    <div className="hero-mesh flex min-h-dvh flex-col items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#FFCC00] shadow-[0_0_24px_rgba(255,204,0,0.3)]">
+            <Ship size={22} className="text-[#092E6D]" />
+          </div>
+          <div className="leading-tight">
+            <h1 className="text-lg font-semibold text-[#F0F4FF]">AGMS Admin</h1>
+            <p className="text-xs text-[#93A5C4]">Sign in to manage vessel listings</p>
           </div>
         </div>
 
@@ -975,41 +1303,46 @@ function SignIn() {
               setBusy(false);
             }
           }}
-          className="space-y-3"
+          className="space-y-4 rounded-2xl border border-white/10 bg-[#0B1E3D]/90 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur"
         >
           <label className="block text-sm font-medium">
-            Email
+            <span className="mb-1.5 block text-[#93A5C4]">Email</span>
             <input
               type="email"
               required
               autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className={input}
-              style={{ borderColor: WP.border }}
+              className={inputCls}
             />
           </label>
           <label className="block text-sm font-medium">
-            Password
+            <span className="mb-1.5 block text-[#93A5C4]">Password</span>
             <input
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={input}
-              style={{ borderColor: WP.border }}
+              className={inputCls}
             />
           </label>
           {status && (
-            <p className={`text-sm ${status.kind === "err" ? "text-red-700" : "text-green-700"}`}>
+            <p
+              role={status.kind === "err" ? "alert" : "status"}
+              className={`rounded-lg border-l-4 px-3 py-2 text-sm ${
+                status.kind === "err"
+                  ? "border-[#F87171] bg-[#F87171]/10 text-[#FCA5A5]"
+                  : "border-[#4ADE80] bg-[#4ADE80]/10 text-[#86EFAC]"
+              }`}
+            >
               {status.text}
             </p>
           )}
           <button
             type="submit"
             disabled={busy}
-            className="w-full rounded bg-[#092E6D] px-4 py-2 font-medium text-white disabled:opacity-60"
+            className="w-full rounded-lg bg-[#FFCC00] px-4 py-2.5 text-sm font-semibold text-[#092E6D] transition-all hover:bg-[#E6B800] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B1E3D] active:scale-[0.98] disabled:opacity-60"
           >
             {busy ? "Signing in…" : "Sign In"}
           </button>
@@ -1024,12 +1357,19 @@ function SignIn() {
                 setStatus({ kind: "err", text: "Could not send reset email." });
               }
             }}
-            className="w-full text-xs underline"
-            style={{ color: WP.muted }}
+            className="w-full text-center text-xs text-[#93A5C4] underline-offset-4 transition-colors hover:text-[#FFCC00] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
           >
             Forgot password?
           </button>
         </form>
+
+        <Link
+          to="/"
+          className="mt-6 flex w-full items-center justify-center gap-1.5 text-xs text-[#93A5C4] transition-colors hover:text-[#FFCC00] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50"
+        >
+          <ArrowLeft size={14} />
+          Back to website
+        </Link>
       </div>
     </div>
   );
@@ -1045,16 +1385,25 @@ function NotAnAdmin({
   onSignOut: () => void;
 }) {
   return (
-    <div className="flex min-h-screen items-center justify-center px-4" style={{ background: WP.canvas }}>
-      <div className="w-full max-w-sm rounded border bg-white p-6" style={{ borderColor: WP.border }}>
-        <h1 className="text-base font-semibold text-[#092E6D]">Access denied</h1>
-        <p className="mt-2 text-sm" style={{ color: WP.muted }}>
-          <strong>{email}</strong> is signed in but is not an administrator.
+    <div className="hero-mesh flex min-h-dvh items-center justify-center px-4 py-10">
+      <div className="w-full max-w-sm rounded-2xl border border-white/10 bg-[#0B1E3D]/90 p-6 shadow-[0_24px_60px_rgba(0,0,0,0.45)] backdrop-blur sm:p-8">
+        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-[#F87171]/15 text-[#F87171]">
+          <X size={22} />
+        </div>
+        <h1 className="text-lg font-semibold text-[#F0F4FF]">Access denied</h1>
+        <p className="mt-2 text-sm leading-relaxed text-[#93A5C4]">
+          <strong className="font-semibold text-[#F0F4FF]">{email}</strong> is signed in but is not
+          an administrator.
         </p>
         {detail && (
-          <p className="mt-2 rounded bg-[#fcf0f1] px-2 py-1 text-xs text-[#8a2424]">{detail}</p>
+          <p className="mt-3 rounded-lg border-l-4 border-[#F87171] bg-[#F87171]/10 px-3 py-2 text-xs text-[#FCA5A5]">
+            {detail}
+          </p>
         )}
-        <button onClick={onSignOut} className="mt-4 rounded border px-4 py-2 text-sm" style={{ borderColor: WP.border }}>
+        <button
+          onClick={onSignOut}
+          className={`${ghostBtn} mt-5 w-full justify-center`}
+        >
           Sign Out
         </button>
       </div>

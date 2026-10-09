@@ -11,6 +11,14 @@ export type Vessel = {
   image: string;
   specs: { label: string; value: string }[];
   summary: string;
+  /** Optional long-form broker copy; the detail page shows it in place of `summary`. */
+  details?: string;
+  /** Optional bullet-point remarks shown on the detail page. */
+  remarks?: string[];
+  /** Optional extra specification rows beyond the six key `specs`. */
+  particulars?: { label: string; value: string }[];
+  /** Optional named contact for this specific listing. */
+  contact?: string;
 };
 
 const img = [
@@ -27,217 +35,307 @@ const img = [
 ];
 
 const blurbs: Record<string, string> = {
-  Barges:
-    "Deck, hopper and spud barges for cargo, dredging support and marine construction projects, available for sale or worldwide charter.",
-  Cargo:
-    "General cargo coasters and multipurpose vessels for short-sea, coastal and regional trades.",
-  "Crane Barge":
-    "Derrick and crane barges for pile driving, subsea installation, salvage and heavy lift campaigns.",
-  "Crew vessels":
-    "Crew transfer and crew boats serving offshore wind, oil & gas terminals and port operations.",
-  "Dive Vessels":
-    "Dive support vessels with A-frames, dive control and survey spreads for inshore and offshore work.",
-  Dredgers:
-    "Cutter suction, trailing suction and grab dredgers for maintenance and capital dredging contracts.",
-  "Fire Fighting Vessels":
-    "FiFi-classed fireboats with monitors, foam systems, rescue craft and towing capability.",
-  "Fishing Boats":
-    "Trawlers, longliners and seiners for inshore and offshore fishing operations.",
-  "For Charter":
-    "Vessels currently open for time, trip or bareboat charter through our brokerage desk.",
-  "Guard / Safety":
-    "Guard and safety vessels with fast rescue craft, hospital facilities and standby capability.",
-  "Jack up Barges":
-    "Self-elevating jack-up platforms for cable lay, wind farm construction, accommodation and repair.",
-  "Landing craft":
-    "Shallow draft landing craft with bow ramps for cargo, plant, fuel and vehicle delivery.",
-  "Marine plant & equipment":
-    "Marine plant and equipment including spuds, anchors, pontoons, winches and dredging spreads.",
-  "Multi Purpose":
-    "Multi-purpose workboats for survey, utility, deck cargo and general marine services.",
-  Multicat:
-    "Multicat workboats with heavy deck cranes for anchor handling, dredging support and civils.",
-  "Passenger Ferries":
-    "Passenger ferries, excursion and restaurant vessels holding valid passenger certificates.",
-  "Patrol boats":
-    "Patrol and enforcement craft for customs, immigration, navy and port authority duties.",
-  "Pilot boats":
-    "Pilot launches with push-on fendering and safe boarding arrangements for harbour and terminal duties.",
-  "Pollution control":
-    "Oil spill response and pollution control vessels with skimmers, booms and recovered oil tankage.",
-  "Project vessel":
-    "Project and conversion vessels suited to research, accommodation and specialist campaigns.",
-  "Reduced In Price":
-    "Vessels currently offered at reduced prices, or from motivated vendors open to offers.",
-  "Ribs & Tenders":
-    "RIBs, tenders and small workboats for crew transfer, dive support and yacht services.",
-  "Semi submarine":
-    "Semi-submersible and glass-bottom vessels for tourism, survey and inspection work.",
-  "Supply Vessel":
-    "Platform supply and anchor handling vessels with DP capability for offshore field support.",
-  Survey:
-    "Hydrographic and geophysical survey vessels with moon pools, winches and positioning systems.",
-  Tankers:
-    "Product, bunker and chemical tankers with double hull and modern pumping arrangements.",
-  Tugs:
-    "Harbour, coastal and ASD tugs with up to 85 tonnes bollard pull, FiFi and escort notation.",
-  Uncategorized:
-    "Newly listed vessels currently awaiting classification by our brokerage team.",
+  "For Sale":
+    "Vessels offered for outright sale through our brokerage desk, with survey, documentation and worldwide delivery arranged.",
 };
 
 /** title, location, price, built, loa, beam, draft, power/equipment, class, sector */
 type Row = [string, string, string, string, string, string, string, string, string, string];
 
 const rows: Record<string, Row[]> = {
-  Barges: [
-    ["36.5m Flattop Deck Cargo Barge – For sale or charter", "NORTH EUROPE", "POA", "2008", "36.50 m", "12.20 m", "2.44 m", "Deck load 10 t/m²", "Load line, unclassed", "For sale or charter"],
-    ["44.1m Split Hopper Barge for Charter", "UK COAST", "POA", "1998", "44.10 m", "8.20 m", "2.23 m", "Hopper 400 m³", "Bureau Veritas", "For charter"],
-    ["28m Spud Barge with 4-point Mooring", "WEST AFRICA", "185,000 USD", "2006", "28.00 m", "10.50 m", "1.80 m", "Spuds 18 m", "Unclassed", "For sale"],
-  ],
-  Cargo: [
-    ["82m General Cargo Coaster – For sale", "BLACK SEA", "1,950,000 USD", "1999", "82.00 m", "11.40 m", "3.85 m", "2,250 dwt", "RINA", "For sale"],
-    ["68m Multipurpose Cargo Vessel", "MEDITERRANEAN", "POA", "2004", "68.00 m", "10.20 m", "3.40 m", "1,600 dwt", "Bureau Veritas", "For sale"],
-    ["45m Coastal Cargo Vessel with Box Hold", "UK", "320,000 GBP", "1994", "45.00 m", "8.20 m", "2.90 m", "640 dwt", "DNV", "For sale"],
-  ],
-  "Crane Barge": [
-    ["45m Crane Barge with 250t Derrick", "NORTH SEA", "POA", "2003", "45.00 m", "18.00 m", "3.20 m", "Crane 250 t", "ABS", "For sale or charter"],
-    ["32m Sheerleg Crane Barge 120t", "SOUTH EAST ASIA", "POA", "1999", "32.00 m", "14.00 m", "2.60 m", "Crane 120 t", "Unclassed", "For charter"],
-    ["24m Spud Crane Barge", "WEST AFRICA", "295,000 USD", "2010", "24.00 m", "11.00 m", "1.60 m", "Crane 45 t", "Unclassed", "For sale"],
-  ],
-  "Crew vessels": [
-    ["24m Aluminium Crew Transfer Vessel – For charter", "NORTH SEA", "POA", "2014", "24.00 m", "9.00 m", "1.60 m", "2 x 1,000 hp", "DNV HSLC / MCA Cat 1", "For charter"],
-    ["18m Crew Boat 12 PAX", "WEST AFRICA", "480,000 USD", "2011", "18.00 m", "5.60 m", "1.30 m", "2 x 1,200 hp", "MCA Cat 1", "For sale"],
-    ["32m Fast Crew Boat 50 PAX", "MIDDLE EAST", "POA", "2016", "32.00 m", "7.20 m", "1.80 m", "3 x 1,800 hp", "ABS HSC", "For charter"],
-  ],
-  "Dive Vessels": [
-    ["10.10m Survey & Dive Vessel – For sale or Charter", "UK", "0.00 GBP", "2012", "10.10 m", "5.73 m", "1.20 m", "2 x 150 hp", "MCA Cat 2 coded", "For sale or charter"],
-    ["26m Dive Support Vessel with Sat System", "NORTH SEA", "POA", "2009", "26.00 m", "8.60 m", "2.10 m", "Deck crane 10 t", "DNV", "For charter"],
-    ["16m Catamaran Dive Support Boat", "MEDITERRANEAN", "210,000 EUR", "2013", "16.00 m", "6.40 m", "1.10 m", "A-frame 3 t", "MCA Cat 3", "For sale"],
-  ],
-  Dredgers: [
-    ["18m Cutter Suction Dredger – For sale", "NETHERLANDS", "POA", "2011", "18.00 m", "6.00 m", "1.40 m", "Cutter 150 kW", "Unclassed", "For sale"],
-    ["46m TSHD 1,200 m³", "SOUTH EAST ASIA", "POA", "2007", "46.00 m", "11.20 m", "3.60 m", "Hopper 1,200 m³", "RINA", "For sale or charter"],
-    ["32m Grab Hopper Dredger", "WEST AFRICA", "650,000 USD", "2005", "32.00 m", "9.00 m", "2.40 m", "Grab 8 m³", "Bureau Veritas", "For sale"],
-  ],
-  "Fire Fighting Vessels": [
-    ["25m FiFi 1 Fire Fighting Vessel", "MIDDLE EAST", "POA", "2008", "25.00 m", "8.00 m", "2.20 m", "FiFi 1 x 1,200 m³/h", "ABS", "For sale"],
-    ["18m Port Fire Boat", "UK", "295,000 GBP", "2001", "18.00 m", "5.80 m", "1.50 m", "Monitors 2 x 600 m³/h", "MCA Cat 2", "For sale"],
-    ["33m FiFi 2 Emergency Response Vessel", "NORTH SEA", "POA", "2012", "33.00 m", "9.60 m", "3.10 m", "FiFi 2 x 2,200 m³/h", "DNV", "For charter"],
-  ],
-  "Fishing Boats": [
-    ["28m Steel Trawler", "NORTH EAST ATLANTIC", "385,000 EUR", "1996", "28.00 m", "7.20 m", "3.40 m", "900 hp", "Bureau Veritas", "For sale"],
-    ["15m Longliner", "WEST AFRICA", "120,000 USD", "2004", "15.00 m", "5.00 m", "2.10 m", "450 hp", "Unclassed", "For sale"],
-    ["34m Purse Seiner", "MEDITERRANEAN", "POA", "2009", "34.00 m", "8.20 m", "3.80 m", "1,400 hp", "RINA", "For sale"],
-  ],
-  "For Charter": [
-    ["38m AHTS 65t BP – Available for Charter", "NORTH SEA", "POA", "2010", "38.00 m", "11.20 m", "4.20 m", "Bollard pull 65 t", "DNV", "For charter"],
-    ["22m Multicat for Charter", "UK COAST", "POA", "2015", "22.00 m", "8.40 m", "1.50 m", "Deck crane 20 t/m", "MCA Cat 2", "For charter"],
-    ["55m PSV – Charter Available", "WEST AFRICA", "POA", "2011", "55.00 m", "13.20 m", "4.40 m", "Deck 420 m²", "ABS DP1", "For charter"],
-  ],
-  "Guard / Safety": [
-    ["35m Standby Safety Vessel", "NORTH SEA", "POA", "2005", "35.00 m", "10.20 m", "3.60 m", "FRC 2 x 16 PAX", "DNV", "For charter"],
-    ["27m Guard Vessel with Rescue Facility", "MIDDLE EAST", "POA", "2008", "27.00 m", "8.40 m", "2.60 m", "Hospital bay", "ABS", "For sale or charter"],
-    ["19m Fast Rescue Craft", "NORTH SEA", "240,000 GBP", "2013", "19.00 m", "5.40 m", "1.20 m", "2 x 1,000 hp", "MCA Cat 1", "For sale"],
-  ],
-  "Jack up Barges": [
-    ["45m Jack Up Platform, 400t capacity", "NORTH SEA", "POA", "2007", "45.00 m", "24.00 m", "3.20 m", "Legs 45 m", "ABS", "For sale or charter"],
-    ["32m Self-Elevating Jack Up Barge", "SOUTH EAST ASIA", "POA", "2011", "32.00 m", "18.00 m", "2.60 m", "Crane 80 t", "Bureau Veritas", "For charter"],
-    ["26m Mini Jack Up with Accommodation", "MIDDLE EAST", "1,100,000 USD", "2014", "26.00 m", "14.00 m", "2.10 m", "12 berths", "Unclassed", "For sale"],
-  ],
-  "Landing craft": [
-    ["11.5m Aluminium Landing Craft – For sale", "UK", "185,000 GBP", "2016", "11.50 m", "4.20 m", "0.90 m", "Deck crane 2.5 t/m", "MCA Workboat Code Cat 2", "For sale"],
-    ["21m Steel Landing Craft", "WEST AFRICA", "220,000 USD", "2012", "21.00 m", "6.40 m", "1.30 m", "Payload 40 t", "Unclassed", "For sale"],
-    ["15m Beach Landing Craft", "MIDDLE EAST", "POA", "2018", "15.00 m", "5.20 m", "0.85 m", "Payload 18 t", "Unclassed", "For sale or charter"],
-  ],
-  "Marine plant & equipment": [
-    ["Dredging Spread – Spuds, Winches & Anchors", "NETHERLANDS", "POA", "2010", "—", "—", "—", "Complete spread", "Unclassed", "For sale"],
-    ["4 x Spud Legs 24m with Hydraulic Racks", "UK", "95,000 GBP", "2013", "—", "—", "—", "Legs 24 m", "Unclassed", "For sale"],
-    ["Modular Steel Pontoons 12 x 6m", "WEST AFRICA", "POA", "2015", "12.00 m", "6.00 m", "1.20 m", "Deck load 15 t/m²", "Load line", "For sale or charter"],
-  ],
-  "Multi Purpose": [
-    ["16m Multi Purpose Workboat", "UK", "265,000 GBP", "2015", "16.00 m", "5.60 m", "1.10 m", "Deck crane 3 t/m", "MCA Cat 2", "For sale"],
-    ["24m Multi Purpose Survey Workboat", "NORTH SEA", "POA", "2012", "24.00 m", "7.80 m", "1.80 m", "A-frame 5 t", "DNV", "For sale or charter"],
-    ["30m Multi Purpose Deck Vessel", "MEDITERRANEAN", "POA", "2006", "30.00 m", "9.00 m", "2.20 m", "Deck 180 m²", "RINA", "For charter"],
-  ],
-  Multicat: [
-    ["22m Multicat with 20 t/m Crane", "UK COAST", "POA", "2015", "22.00 m", "8.40 m", "1.50 m", "Deck crane 20 t/m", "MCA Cat 2", "For charter"],
-    ["26m Multicat – Anchor Handling", "NORTH SEA", "POA", "2011", "26.00 m", "9.60 m", "1.90 m", "Winch 40 t", "DNV", "For sale or charter"],
-    ["18m Multicat Utility Vessel", "WEST AFRICA", "420,000 USD", "2013", "18.00 m", "7.60 m", "1.30 m", "Deck crane 12 t/m", "Unclassed", "For sale"],
-  ],
-  "Passenger Ferries": [
-    ["32.5m Yacht -16 cabin, restaurant vessel – For sale", "MEDITERRANEAN", "1,250,000 EUR", "1996 / refit 2019", "32.50 m", "7.60 m", "1.95 m", "120 passengers", "RINA", "For sale"],
-    ["40m Passenger Ferry 250 PAX", "SOUTH EAST ASIA", "POA", "2008", "40.00 m", "9.80 m", "2.30 m", "2 x 1,500 hp", "Bureau Veritas", "For sale"],
-    ["24m Catamaran Excursion Vessel", "MIDDLE EAST", "690,000 USD", "2014", "24.00 m", "8.00 m", "1.40 m", "150 passengers", "MCA Cat 2", "For sale"],
-  ],
-  "Patrol boats": [
-    ["28m Aluminium Patrol Boat", "WEST AFRICA", "POA", "2016", "28.00 m", "6.20 m", "1.60 m", "3 x 1,800 hp", "ABS", "For sale"],
-    ["19m Fast Interceptor Craft", "MIDDLE EAST", "340,000 USD", "2018", "19.00 m", "5.20 m", "1.10 m", "2 x 1,200 hp", "Unclassed", "For sale"],
-    ["35m Coastal Patrol Vessel", "MEDITERRANEAN", "POA", "2011", "35.00 m", "7.40 m", "2.20 m", "2 x 2,400 hp", "RINA", "For sale or charter"],
-  ],
-  "Pilot boats": [
-    ["16m Pilot Launch", "UK", "245,000 GBP", "2013", "16.00 m", "5.20 m", "1.40 m", "2 x 600 hp", "MCA Cat 3", "For sale"],
-    ["22m Sea Going Pilot Boat", "NORTH SEA", "POA", "2010", "22.00 m", "6.60 m", "1.90 m", "2 x 1,000 hp", "DNV", "For sale or charter"],
-    ["12m Harbour Pilot Boat", "WEST AFRICA", "135,000 USD", "2015", "12.00 m", "4.20 m", "1.00 m", "2 x 380 hp", "Unclassed", "For sale"],
-  ],
-  "Pollution control": [
-    ["26m Oil Spill Response Vessel", "NORTH SEA", "POA", "2009", "26.00 m", "9.00 m", "2.20 m", "Skimmer 100 m³/h", "DNV", "For sale or charter"],
-    ["18m Pollution Control Boat", "MEDITERRANEAN", "285,000 EUR", "2012", "18.00 m", "6.20 m", "1.40 m", "Boom 300 m", "RINA", "For sale"],
-    ["32m Emergency Response & Recovery Vessel", "MIDDLE EAST", "POA", "2015", "32.00 m", "9.80 m", "2.80 m", "Tankage 220 m³", "ABS", "For charter"],
-  ],
-  "Project vessel": [
-    ["55m Project / Accommodation Vessel", "NORTH SEA", "POA", "2002 / refit 2018", "55.00 m", "14.00 m", "4.20 m", "48 berths", "DNV", "For sale or charter"],
-    ["42m Research & Survey Vessel", "MEDITERRANEAN", "POA", "2010", "42.00 m", "10.60 m", "3.40 m", "Moon pool 4 x 4 m", "RINA", "For charter"],
-    ["30m Multipurpose Project Vessel", "WEST AFRICA", "POA", "2007", "30.00 m", "8.80 m", "2.60 m", "Deck crane 15 t", "Bureau Veritas", "For sale"],
-  ],
-  "Reduced In Price": [
-    ["24m Crew Boat – Price Reduced", "WEST AFRICA", "295,000 USD (was 385,000)", "2011", "24.00 m", "6.40 m", "1.60 m", "2 x 1,200 hp", "MCA Cat 1", "For sale"],
-    ["36m Flattop Barge – Reduced", "NORTH EUROPE", "145,000 EUR (was 190,000)", "2005", "36.00 m", "12.00 m", "2.30 m", "Deck load 8 t/m²", "Load line", "For sale"],
-    ["18m Multicat – Offers Invited", "UK", "165,000 GBP (was 210,000)", "2012", "18.00 m", "7.20 m", "1.30 m", "Deck crane 10 t/m", "MCA Cat 2", "For sale"],
-  ],
-  "Ribs & Tenders": [
-    ["8.5m Workboat RIB", "UK", "48,000 GBP", "2018", "8.50 m", "3.10 m", "0.60 m", "2 x 250 hp", "MCA Cat 4", "For sale"],
-    ["12m Survey RIB with A-frame", "NORTH SEA", "POA", "2016", "12.00 m", "4.00 m", "0.75 m", "2 x 350 hp", "MCA Cat 3", "For charter"],
-    ["10m Yacht Support Tender", "MEDITERRANEAN", "92,000 EUR", "2019", "10.00 m", "3.40 m", "0.70 m", "2 x 300 hp", "CE Cat B", "For sale"],
-  ],
-  "Semi submarine": [
-    ["25m Semi-Submarine Tourist Vessel", "MIDDLE EAST", "POA", "2008", "25.00 m", "8.00 m", "2.40 m", "50 passengers", "Bureau Veritas", "For sale"],
-    ["18m Glass Bottom Boat", "MEDITERRANEAN", "210,000 EUR", "2012", "18.00 m", "6.00 m", "1.60 m", "40 passengers", "RINA", "For sale"],
-    ["32m Semi-Submersible Survey Craft", "SOUTH EAST ASIA", "POA", "2010", "32.00 m", "9.60 m", "3.10 m", "Observation deck", "Unclassed", "For sale or charter"],
-  ],
-  "Supply Vessel": [
-    ["60m Platform Supply Vessel – For sale", "WEST AFRICA", "POA", "2010", "60.00 m", "14.00 m", "4.60 m", "Deck 450 m²", "ABS +A1 OSV, DP1", "For sale"],
-    ["55m PSV for Charter", "NORTH SEA", "POA", "2011", "55.00 m", "13.20 m", "4.40 m", "Deck 420 m²", "DNV DP1", "For charter"],
-    ["48m AHTS 70t Bollard Pull", "MIDDLE EAST", "POA", "2009", "48.00 m", "12.60 m", "4.80 m", "Bollard pull 70 t", "ABS", "For sale or charter"],
-  ],
-  Survey: [
-    ["28m Hydrographic Survey Vessel", "NORTH SEA", "POA", "2013", "28.00 m", "8.60 m", "2.30 m", "Moon pool 2 x 2 m", "DNV", "For charter"],
-    ["15m Inshore Survey Craft", "UK", "175,000 GBP", "2016", "15.00 m", "5.00 m", "1.00 m", "Multibeam spread", "MCA Cat 3", "For sale"],
-    ["36m Geophysical Survey Vessel", "WEST AFRICA", "POA", "2006", "36.00 m", "9.80 m", "3.20 m", "Stern A-frame 8 t", "Bureau Veritas", "For sale or charter"],
-  ],
-  Tankers: [
-    ["88m Product Tanker 3,200 dwt", "MEDITERRANEAN", "POA", "2005", "88.00 m", "13.60 m", "5.20 m", "3,200 dwt", "RINA", "For sale"],
-    ["62m Bunker Tanker 1,450 dwt", "WEST AFRICA", "850,000 USD", "2009", "62.00 m", "10.60 m", "4.10 m", "1,450 dwt", "Bureau Veritas", "For sale"],
-    ["45m Coastal Chemical Tanker", "NORTH SEA", "POA", "2011", "45.00 m", "9.20 m", "3.60 m", "Double hull", "DNV", "For sale or charter"],
-  ],
-  Tugs: [
-    ["49.4 TBP Tug Twin Screw, Ice class – For sale", "BALTIC", "POA", "2004", "29.80 m", "9.50 m", "4.10 m", "Bollard pull 49.4 t", "RMRS Ice 2", "For sale"],
-    ["32m ASD Harbour Tug 60t BP", "WEST AFRICA", "POA", "2012", "32.00 m", "11.20 m", "4.40 m", "Bollard pull 60 t", "ABS", "For sale or charter"],
-    ["27m Coastal Towage Tug 35t BP", "UK COAST", "680,000 GBP", "2008", "27.00 m", "9.20 m", "3.80 m", "Bollard pull 35 t", "Bureau Veritas", "For sale"],
-  ],
-  Uncategorized: [
-    ["14m Steel Workboat – New Listing", "UK", "POA", "2010", "14.00 m", "4.80 m", "1.10 m", "2 x 300 hp", "Unclassed", "For sale"],
-    ["20m Unspecified Service Vessel", "WEST AFRICA", "POA", "2007", "20.00 m", "6.80 m", "1.70 m", "Details to follow", "Unclassed", "For sale or charter"],
-    ["33m Vessel – Particulars on Request", "MEDITERRANEAN", "POA", "2003", "33.00 m", "9.20 m", "2.80 m", "Details to follow", "Unclassed", "For charter"],
+  "For Sale": [
+    ["13,100 DWT Oil / Chemical Tanker – For Sale", "WORLDWIDE", "POA", "2006", "125.00 m", "20.20 m", "8.71 m", "MAN B&W 6S35MC, 4,440 kW", "RINA", "For sale"],
+    ["4,300 DWT Oil Tanker with Boiler Heating System – For Sale", "OFFSHORE", "POA", "2012", "97.30 m", "15.30 m", "5.59 m", "Ningdong GN6320, 735 kW", "CCS", "For sale"],
+    ["4,500 DWT Oil Tanker – For Sale", "OFFSHORE / NEAR SEA", "POA", "2011", "97.00 m", "15.20 m", "5.90 m", "Guangzhou Diesel 8320, 2,060 kW", "CCS", "For sale"],
+    ["3,600 DWT Deck Barge – For Sale", "COASTAL WATERS", "POA", "2015", "90.00 m", "19.00 m", "3.50 m", "2 x Yuchai YC6C730L-C20, 536 kW", "ZC", "For sale"],
+    ["Crew Transfer Vessel (CTV 1506) – For Sale", "PORT GENTIL, GABON", "EUR 550,000", "2009", "15.43 m", "6.30 m", "0.90 m", "2 x Scania, 550 kW", "—", "For sale"],
+    ["AHTS MARIDIVE 703 – For Sale", "EGYPT", "On Application", "2011", "—", "—", "—", "2 x MaK, 5,400 BHP (10,800 BHP total)", "ABS A1 (E), DPS-2, FiFi-1", "For sale"],
+    ["AHTS MARIDIVE 704 – For Sale", "EGYPT", "USD 15M (region)", "2011", "—", "—", "—", "2 x MaK, 5,400 BHP (10,800 BHP total)", "ABS A1 (E), DPS-2, FiFi-1", "For sale"],
+    ["DP-2 Diesel Electric Platform Supply Vessel (SPM ALPHA) – For Sale", "TAKORADI, GHANA", "USD 12.5M", "2006", "73.20 m", "16.50 m", "5.63 m", "2 x 1,920 kW Z-drive (diesel-electric)", "ABS A1, FFV 1, DPS-2", "For sale"],
   ],
 };
 
 const built: Vessel[] = [];
 let counter = 0;
 
+/**
+ * Optional per-listing additions that do not fit the positional tuple above,
+ * keyed by the exact `title`. Kept separate so rich copy for one listing never
+ * changes the tuple shape or the id sequence for any other row.
+ */
+const extras: Record<
+  string,
+  {
+    image?: string;
+    details?: string;
+    remarks?: string[];
+    particulars?: { label: string; value: string }[];
+    contact?: string;
+  }
+> = {
+  "13,100 DWT Oil / Chemical Tanker – For Sale": {
+    image: "https://i.ibb.co/60tPbY70/Whats-App-Image-2026-10-08-at-7-18-45-AM.jpg",
+    details:
+      "Korean-built 13,100 DWT oil / chemical tanker with double hull and double bottom construction. Twelve cargo tanks, suitable for clean petroleum products and selected chemical parcels. MAN B&W 6S35MC main engine rated 4,440 kW. RINA class, Panama flag, unlimited navigation. Handy size, well suited for both regional and ocean-going employment.",
+    remarks: [
+      "2006 Korean newbuilding quality",
+      "12 segregated cargo tanks",
+      "Double hull / double bottom",
+      "Worldwide trading capability",
+      "Full specs, GA plan, tank coating, survey status and price on request",
+      "Subject to prior sale, price change or withdrawal",
+    ],
+    particulars: [
+      { label: "Deadweight", value: "13,100 MT" },
+      { label: "Builder", value: "South Korea" },
+      { label: "Flag", value: "Panama" },
+      { label: "Depth", value: "11.30 m" },
+      { label: "Light draft", value: "2.56 m" },
+      { label: "Cargo tanks", value: "12" },
+      { label: "Hull", value: "Double bottom / double hull" },
+      { label: "Gross tonnage", value: "8,560" },
+      { label: "Net tonnage", value: "4,093" },
+      { label: "Trading area", value: "Unlimited / worldwide" },
+    ],
+    contact: "Anna (Vice President)",
+  },
+  "4,300 DWT Oil Tanker with Boiler Heating System – For Sale": {
+    image: "https://i.ibb.co/N612YgY1/Whats-App-Image-2026-10-08-at-7-24-52-AM.jpg",
+    details:
+      "Well-maintained 4,300 DWT oil tanker built in 2012 in Zhejiang, China, and fully certified by CCS. Double-bottom and double-hull design with ten cargo holds and a boiler heating system for cargo temperature management, allowing a wider range of oil products to be carried. Ningdong GN6320 main engine rated 735 kW. Well maintained and suitable for immediate offshore deployment.",
+    remarks: [
+      "Modern double-hull design complies with enhanced environmental and safety standards",
+      "Boiler heating system permits a wider range of oil products",
+      "Built by a reputable Chinese shipyard and maintained under CCS class",
+      "Good condition, suitable for immediate deployment",
+    ],
+    particulars: [
+      { label: "Deadweight", value: "4,300 MT" },
+      { label: "Builder", value: "Zhejiang, China" },
+      { label: "Loaded draft", value: "5.586 m" },
+      { label: "Ballast draft", value: "3.6 m" },
+      { label: "Gross tonnage", value: "2,950" },
+      { label: "Net tonnage", value: "1,650" },
+      { label: "Cargo holds", value: "10" },
+      { label: "Hull", value: "Double bottom / double hull" },
+      { label: "Trading area", value: "Offshore" },
+    ],
+    contact: "Anna (Vice President)",
+  },
+  "4,500 DWT Oil Tanker – For Sale": {
+    image: "https://i.ibb.co/6cTsRkpb/Whats-App-Image-2026-10-08-at-7-29-44-AM.jpg",
+    details:
+      "This 4,500 DWT oil tanker was built in 2011 in Guangxi, China and is classed with CCS. The vessel is of double bottom and double hull construction with 10 cargo tanks. She is powered by a Guangzhou Diesel 8320 main engine rated at 2,060 kW. Trading area is offshore / near sea. The vessel is in good condition and available for inspection by appointment.",
+    remarks: [
+      "Double bottom and double hull construction with 10 cargo tanks",
+      "Guangzhou Diesel 8320 main engine rated 2,060 kW",
+      "Offshore / near sea trading area",
+      "Good condition, available for inspection by appointment",
+    ],
+    particulars: [
+      { label: "Deadweight", value: "4,500 MT" },
+      { label: "Builder", value: "Guangxi, China" },
+      { label: "Moulded depth", value: "7.0 m" },
+      { label: "Light draught", value: "3.8 m" },
+      { label: "Cargo tanks", value: "10" },
+      { label: "Hull", value: "Double bottom / double hull" },
+      { label: "Gross tonnage", value: "3,000" },
+      { label: "Net tonnage", value: "1,680" },
+      { label: "Trading area", value: "Offshore / Near Sea" },
+    ],
+    contact: "Anna",
+  },
+  "3,600 DWT Deck Barge – For Sale": {
+    image: "https://i.ibb.co/b5scrVyN/Whats-App-Image-2026-10-08-at-7-46-05-AM-1.jpg",
+    details:
+      "3,600 DWT deck barge built in 2015 in Jiangsu, China and classed with ZC under the PRC flag. Open flat deck design with no cargo holds — well suited to project cargo, heavy lift and modular transport. Twin Yuchai YC6C730L-C20 main engines rated 536 kW each, trading in coastal waters. Well maintained and ready for inspection and delivery.",
+    remarks: [
+      "Open flat deck, no cargo holds — ideal for project cargo, heavy lift or modular transport",
+      "Twin Yuchai YC6C730L-C20 main engines, 536 kW each",
+      "Built 2015, well maintained, ready for inspection and delivery",
+    ],
+    particulars: [
+      { label: "Deadweight", value: "Approx. 3,600 MT" },
+      { label: "Builder", value: "Jiangsu, China" },
+      { label: "Flag", value: "Chinese (PRC)" },
+      { label: "Moulded depth", value: "5.00 m" },
+      { label: "Light draft", value: "3.00 m" },
+      { label: "Structure", value: "Single bottom, single side shell" },
+      { label: "Gross tonnage", value: "1,300 GT" },
+      { label: "Net tonnage", value: "2,300 NT" },
+      { label: "Navigation area", value: "Coastal waters" },
+    ],
+    contact: "Taizhou Changlong Shipping Trading Co., Ltd – Anna (Vice President)",
+  },
+  "Crew Transfer Vessel (CTV 1506) – For Sale": {
+    image: "https://i.ibb.co/0jY4ytqg/Unknown-1.jpg",
+    details:
+      "Crew transfer vessel (model CTV 1506) built in 2009, measuring 15.43 m LOA with a 6.30 m beam and a shallow 0.90 m aft draft. Powered by twin Scania main engines rated 550 kW each, achieving a maximum speed of 23–24 knots with capacity for 12 POB. Port engine renewed, starboard engine 12,000 hours, fuel capacity 3.64 m³. Available for inspection at Port Gentil, Gabon.",
+    remarks: [
+      "Twin Scania main engines, 550 kW each",
+      "Max speed 23 – 24 knots, 12 POB",
+      "Engine hours: PS renewed / 12,000 h (SB)",
+      "Inspection by appointment at Port Gentil, Gabon",
+    ],
+    particulars: [
+      { label: "Model", value: "CTV 1506" },
+      { label: "Vessel type", value: "Crew Transfer Vessel (CTV)" },
+      { label: "Draft (aft)", value: "0.90 m" },
+      { label: "Max speed", value: "23 – 24 knots" },
+      { label: "POB", value: "12" },
+      { label: "Engine hours", value: "PS renewed / 12,000 h (SB)" },
+      { label: "Fuel capacity", value: "3.64 m³" },
+      { label: "Inspection", value: "Port Gentil, Gabon" },
+    ],
+  },
+  "AHTS MARIDIVE 703 – For Sale": {
+    image: "https://i.ibb.co/1tJTzBHd/image-8.png",
+    details:
+      "MARIDIVE 703 — 2011-built anchor handling tug supply vessel (AHTS), DP-2 / FiFi-1, classed ABS +A1 (E) Offshore Support & Fire-Fighting Vessel Class 1 + AMS + DPS-2. Sister vessel to MARIDIVE 704 with identical specifications and capacities. Due for dry dock and available as-is or fully post-DD — buyer's preference determines the final commercial position. Bollard pull 150 t, deck cargo 800 t. Twin MaK main engines of 5,400 BHP each (10,800 BHP total), DP-2, 150 t double drum waterfall winch, 5 t deck crane, Class 1 external FiFi monitors and 50 berths. Inspection Egypt.",
+    remarks: [
+      "Due for Dry Dock — available as-is OR fully post-DD",
+      "Buyer's preference determines final commercial position",
+      "Price on application, subject to selected delivery basis",
+      "Sister vessel to MARIDIVE 704, identical specifications",
+    ],
+    particulars: [
+      { label: "Class", value: "ABS A1 (E) O.S.V. & FFV Class 1 + AMS + DPS-2" },
+      { label: "Bollard pull", value: "150 t" },
+      { label: "Deck cargo capacity", value: "800 t" },
+      { label: "Clear deck space", value: "470 m²" },
+      { label: "Main engines", value: "2 x MaK, 5,400 BHP each (10,800 BHP total)" },
+      { label: "Auxiliaries", value: "2 x CAT diesel generators, 590 kW each" },
+      { label: "Shaft alternators", value: "2 x 2,000 kW (440V, 3-phase, 60 Hz)" },
+      { label: "Emergency generator", value: "1 x CAT, 99 kW" },
+      { label: "Bow thrusters", value: "2 x transverse, 9.5 t each" },
+      { label: "Stern thrusters", value: "2 x transverse, 9.5 t each" },
+      { label: "Dynamic positioning", value: "DP-2" },
+      { label: "Winch", value: "Electro-hydraulic double drum waterfall type" },
+      { label: "Line pull", value: "150 t @ 3 m/min" },
+      { label: "Brake holding", value: "450 t" },
+      { label: "Tow wire", value: "1,400 m x 76 mm dia" },
+      { label: "A/H wire", value: "220 m x 76 mm dia" },
+      { label: "Towing pins", value: "1 set hydraulic, up to 160 t BP vessels" },
+      { label: "Shark jaws", value: "Retractable, up to 300 t SWL" },
+      { label: "Capstans", value: "2 x 10 t" },
+      { label: "Tugger winches", value: "2 x 10 t (cargo shifting)" },
+      { label: "Stern roller", value: "6.0 m x 2.5 m dia" },
+      { label: "Anchors", value: "2 x HHP stockless, 1,980 kg each" },
+      { label: "Deck crane", value: "5 t SWL @ 15 m radius" },
+      { label: "FiFi Class 1 monitors", value: "2 x foam + water, 1,200 m³/hr each, 100 m throw, 45 m effective height" },
+      { label: "Seawater pumps", value: "2 x 1,600 m³/hr each @ 140 m" },
+      { label: "Foam tank", value: "11.7 m³" },
+      { label: "Spray booms", value: "2 x 8 m, 6 nozzles each" },
+      { label: "Dispersant tank", value: "12.2 m³" },
+      { label: "Accommodation", value: "50 berths, fully A/C hot & cold climate" },
+      { label: "Navigation & comms", value: "Furuno radar, SSB, 3 x Anschutz gyro, depth + autopilot, GPS, GMDSS, 3 x VHF" },
+      { label: "Inspection", value: "Egypt" },
+    ],
+  },
+  "AHTS MARIDIVE 704 – For Sale": {
+    image: "https://i.ibb.co/1tJTzBHd/image-8.png",
+    details:
+      "MARIDIVE 704 — 2011-built anchor handling tug supply vessel (AHTS), DP-2 / FiFi-1, classed ABS +A1 (E) Offshore Support & Fire-Fighting Vessel Class 1 + AMS + DPS-2. Sister vessel to MARIDIVE 703 with identical specifications and capacities. Currently finalising dry dock and available as-is or fully post-DD — buyer's preference determines the final commercial position. Bollard pull 150 t, deck cargo 800 t. Twin MaK main engines of 5,400 BHP each (10,800 BHP total), DP-2, 150 t double drum waterfall winch, 5 t deck crane, Class 1 external FiFi monitors and 50 berths. Inspection Egypt.",
+    remarks: [
+      "Currently finalising Dry Dock — available as-is OR fully post-DD",
+      "Buyer's preference determines final commercial position",
+      "Region USD 15M on post-DD basis, to be finalised subject to condition and delivery basis",
+      "Sister vessel to MARIDIVE 703, identical specifications",
+    ],
+    particulars: [
+      { label: "Class", value: "ABS A1 (E) O.S.V. & FFV Class 1 + AMS + DPS-2" },
+      { label: "Bollard pull", value: "150 t" },
+      { label: "Deck cargo capacity", value: "800 t" },
+      { label: "Clear deck space", value: "470 m²" },
+      { label: "Main engines", value: "2 x MaK, 5,400 BHP each (10,800 BHP total)" },
+      { label: "Auxiliaries", value: "2 x CAT diesel generators, 590 kW each" },
+      { label: "Shaft alternators", value: "2 x 2,000 kW (440V, 3-phase, 60 Hz)" },
+      { label: "Emergency generator", value: "1 x CAT, 99 kW" },
+      { label: "Bow thrusters", value: "2 x transverse, 9.5 t each" },
+      { label: "Stern thrusters", value: "2 x transverse, 9.5 t each" },
+      { label: "Dynamic positioning", value: "DP-2" },
+      { label: "Winch", value: "Electro-hydraulic double drum waterfall type" },
+      { label: "Line pull", value: "150 t @ 3 m/min" },
+      { label: "Brake holding", value: "450 t" },
+      { label: "Tow wire", value: "1,400 m x 76 mm dia" },
+      { label: "A/H wire", value: "220 m x 76 mm dia" },
+      { label: "Towing pins", value: "1 set hydraulic, up to 160 t BP vessels" },
+      { label: "Shark jaws", value: "Retractable, up to 300 t SWL" },
+      { label: "Capstans", value: "2 x 10 t" },
+      { label: "Tugger winches", value: "2 x 10 t (cargo shifting)" },
+      { label: "Stern roller", value: "6.0 m x 2.5 m dia" },
+      { label: "Anchors", value: "2 x HHP stockless, 1,980 kg each" },
+      { label: "Deck crane", value: "5 t SWL @ 15 m radius" },
+      { label: "FiFi Class 1 monitors", value: "2 x foam + water, 1,200 m³/hr each, 100 m throw, 45 m effective height" },
+      { label: "Seawater pumps", value: "2 x 1,600 m³/hr each @ 140 m" },
+      { label: "Foam tank", value: "11.7 m³" },
+      { label: "Spray booms", value: "2 x 8 m, 6 nozzles each" },
+      { label: "Dispersant tank", value: "12.2 m³" },
+      { label: "Accommodation", value: "50 berths, fully A/C hot & cold climate" },
+      { label: "Navigation & comms", value: "Furuno radar, SSB, 3 x Anschutz gyro, depth + autopilot, GPS, GMDSS, 3 x VHF" },
+      { label: "Inspection", value: "Egypt" },
+    ],
+  },
+  "DP-2 Diesel Electric Platform Supply Vessel (SPM ALPHA) – For Sale": {
+    image: "https://i.ibb.co/fdVz595C/image-9.png",
+    details:
+      "SPM ALPHA — 2006-built diesel electric DP-2 platform supply vessel of the GPA 670 design, built Zhejiang, China, Liberian flag, classed ABS +A1 Offshore Support Vessel (FFV 1), Safety Standby Service, AMS, ACCU, DPS-2. LOA 73.20 m, moulded beam 16.50 m, 3,230 t DWT, 2,321 GRT / 696 NRT, max speed 13 knots at 100% MCR. Diesel-electric machinery: 3 x 1,825 kW main generators driving 2 x 1,920 kW fixed-pitch 360° Z-drives with 2 x 746 kW tunnel bow thrusters. 689 m² cargo deck at 5 t/m² for 1,600 t deck cargo, with full liquid mud / brine (1,092 m³), base oil and dry bulk cement capability. Recently completed dry dock at Nam Dock and currently employed in Takoradi, Ghana until mid-November 2026. Inspection Takoradi, Ghana post-charter. All details given without guarantee.",
+    remarks: [
+      "Recently completed dry dock at Nam Dock — no near-term dry-dock spend",
+      "GPA 670 design — highly capable PSV for deep and shallow water operations",
+      "Diesel electric propulsion — materially lower fuel burn and emissions than direct-drive peers",
+      "FFV-1 + Safety Standby Service notation — dual-purpose supply + standby role",
+      "Compact 73 m footprint with 3,230 DWT — punches above her size class",
+      "Inspection Takoradi, Ghana post-charter mid-November",
+    ],
+    particulars: [
+      { label: "Vessel type", value: "Diesel Electric DP-2 PSV (GPA 670 Design)" },
+      { label: "Flag", value: "Liberia" },
+      { label: "Built", value: "2006, Zhejiang, China" },
+      { label: "LOA", value: "73.20 m" },
+      { label: "Beam (moulded)", value: "16.50 m" },
+      { label: "Depth (moulded)", value: "6.80 m" },
+      { label: "Draft", value: "5.63 m" },
+      { label: "DWT", value: "3,230 t" },
+      { label: "GRT / NRT", value: "2,321 / 696" },
+      { label: "Max speed", value: "13 knots (100% MCR)" },
+      { label: "Main generators", value: "3 x 1,825 kW" },
+      { label: "Main propulsion", value: "2 x 1,920 kW Z-drives, fixed pitch, 360°" },
+      { label: "Bow thrusters", value: "2 x 746 kW tunnel" },
+      { label: "Emergency generator", value: "190 kW @ 1,800 rpm" },
+      { label: "Dynamic positioning", value: "DP-2" },
+      { label: "Deck area", value: "50.30 m x 13.70 m (approx. 689 m²)" },
+      { label: "Deck strength", value: "5 t/m²" },
+      { label: "Deck cargo", value: "1,600 t" },
+      { label: "Fuel oil", value: "1,064 m³" },
+      { label: "Drill water", value: "759 m³" },
+      { label: "Fresh water", value: "535 m³" },
+      { label: "Liquid mud / brine", value: "1,092 m³" },
+      { label: "Base oil", value: "188 m³" },
+      { label: "Dry bulk / cement", value: "255 m³" },
+      { label: "Cargo delivery", value: "FO/DW/FW 150 m³/hr @ 9 bar; mud/brine 2 x 75 m³/hr @ 15 bar; base oil 150 m³/hr @ 9 bar; bulk 50 t/hr @ 6 bar" },
+      { label: "Deck crane", value: "1.6 t @ 10 m with roll reduction system" },
+      { label: "Tugger", value: "1 x 10 t" },
+      { label: "Capstans", value: "2 x 8 t" },
+      { label: "Fire pumps", value: "2 x 1,500 m³/hr" },
+      { label: "FiFi monitors", value: "2 x" },
+      { label: "Life saving", value: "Full arrangement per class + standby rescue equipment" },
+      { label: "Accommodation", value: "30 POB, fully air-conditioned" },
+      { label: "Navigation", value: "2 x radars, 2 x gyrocompasses, 1 x magnetic compass, echo sounder, speed log, autopilot, GPS + 2 x DGPS" },
+      { label: "Communications", value: "GMDSS A3, broadband" },
+      { label: "Class", value: "ABS +A1 O.S.V. (FFV 1), Safety Standby Service, AMS, ACCU, DPS-2" },
+      { label: "Status", value: "Recently completed dry dock at Nam Dock" },
+      { label: "Currently employed", value: "Takoradi, Ghana until mid-November 2026" },
+      { label: "Inspection", value: "Takoradi, Ghana post-charter" },
+    ],
+  },
+};
+
 Object.keys(rows).forEach((category) => {
   rows[category].forEach((r) => {
     const [title, location, price, year, loa, beam, draft, power, cls, sector] = r;
     const index = counter++;
+    const extra = extras[title];
     built.push({
       id: `v-${1000 + index}`,
       agmId: `AGM ${1000 + index}`,
@@ -248,7 +346,7 @@ Object.keys(rows).forEach((category) => {
         loa === "—" ? power : `${loa.replace(" m", "")} x ${beam.replace(" m", "")} x ${draft.replace(" m", "")}m draft`,
       location,
       price,
-      image: img[index % img.length],
+      image: extra?.image ?? img[index % img.length],
       summary: `${blurbs[category]} This unit is offered from ${location.toLowerCase()} with delivery by arrangement. Particulars are given in good faith and without guarantee.`,
       specs: [
         { label: "Built", value: year },
@@ -258,6 +356,10 @@ Object.keys(rows).forEach((category) => {
         { label: "Power / capacity", value: power },
         { label: "Class", value: cls },
       ],
+      ...(extra?.details ? { details: extra.details } : {}),
+      ...(extra?.remarks ? { remarks: extra.remarks } : {}),
+      ...(extra?.particulars ? { particulars: extra.particulars } : {}),
+      ...(extra?.contact ? { contact: extra.contact } : {}),
     });
   });
 });
@@ -265,36 +367,7 @@ Object.keys(rows).forEach((category) => {
 export const vessels: Vessel[] = built;
 
 /** Full category list as shown in the vessel search dropdown. */
-export const CATEGORY_LIST = [
-  "Barges",
-  "Cargo",
-  "Crane Barge",
-  "Crew vessels",
-  "Dive Vessels",
-  "Dredgers",
-  "Fire Fighting Vessels",
-  "Fishing Boats",
-  "For Charter",
-  "Guard / Safety",
-  "Jack up Barges",
-  "Landing craft",
-  "Marine plant & equipment",
-  "Multi Purpose",
-  "Multicat",
-  "Passenger Ferries",
-  "Patrol boats",
-  "Pilot boats",
-  "Pollution control",
-  "Project vessel",
-  "Reduced In Price",
-  "Ribs & Tenders",
-  "Semi submarine",
-  "Supply Vessel",
-  "Survey",
-  "Tankers",
-  "Tugs",
-  "Uncategorized",
-];
+export const CATEGORY_LIST = ["For Sale"];
 
 export const sectors = [
   "All",

@@ -46,25 +46,63 @@ export type AdminVessel = Vessel & { published: boolean };
 
 export type VesselDoc = Omit<Vessel, "id"> & {
   published: boolean;
+  /** Legacy name for `agmId`; still present on pre-rename documents. */
+  wbsId?: string;
   createdAt?: unknown;
   updatedAt?: unknown;
 };
 
 const COLLECTION = "vessels";
 
-/** Strips the public `id` (it becomes the document id) for a clean write. */
+/**
+ * Resolves a listing's AGM/Listing ID so it is never blank.
+ *
+ * The reference was renamed `wbsId` → `agmId` in the UI redesign, but
+ * documents seeded before the rename only carry `wbsId`, and documents can be
+ * saved with an empty value. Every read AND write goes through here:
+ *
+ *  1. a non-blank `agmId` (what admins edit in the dashboard), else
+ *  2. `AGM <n>` derived from the `v-<n>` document id, else
+ *  3. the legacy `wbsId`, else
+ *  4. the raw document id.
+ */
+function resolveAgmId(
+  data: { readonly agmId?: unknown; readonly wbsId?: unknown },
+  docId: string,
+): string {
+  const current = typeof data.agmId === "string" ? data.agmId.trim() : "";
+  if (current) return current;
+  const suffix = docId.replace(/^v-/, "");
+  if (/^\d+$/.test(suffix)) return `AGM ${suffix}`;
+  const legacy = typeof data.wbsId === "string" ? data.wbsId.trim() : "";
+  if (legacy) return legacy;
+  return docId;
+}
+
+/**
+ * Strips the public `id` (it becomes the document id) for a clean write, and
+ * guarantees a listing ID: `agmId` is always written, and `wbsId` is written
+ * as a mirror of it because the currently DEPLOYED security rules still
+ * validate `wbsId` (see `firestore.rules`). After the rules are redeployed
+ * with `firebase deploy --only firestore` the mirror is harmless and can be
+ * dropped — until then it is what keeps "Add vessel" and re-seeds passing
+ * rules.
+ */
 function toDoc(vessel: Vessel) {
-  const { id: _id, ...rest } = vessel;
-  return rest;
+  const { id, ...rest } = vessel;
+  const agmId = resolveAgmId(rest, id);
+  return { ...rest, agmId, wbsId: agmId };
 }
 
 function fromSnapshot(snap: QueryDocumentSnapshot): Vessel {
-  return { ...(snap.data() as VesselDoc), id: snap.id };
+  const data = snap.data() as VesselDoc;
+  return { ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) };
 }
 
 /** Same as `fromSnapshot`, but keeps the draft/published flag. */
 function fromAdminSnapshot(snap: QueryDocumentSnapshot): AdminVessel {
-  return { ...(snap.data() as VesselDoc), id: snap.id } as AdminVessel;
+  const data = snap.data() as VesselDoc;
+  return { ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) } as AdminVessel;
 }
 
 /** All published listings, optionally narrowed to one category. */
@@ -103,7 +141,7 @@ export async function getVessel(id: string): Promise<Vessel | null> {
   if (!snap.exists()) return null;
   const data = snap.data() as VesselDoc;
   if (!data.published) return null;
-  return { ...data, id: snap.id };
+  return { ...data, id: snap.id, agmId: resolveAgmId(data, snap.id) };
 }
 
 /** Next free numeric id / AGM reference. Used when adding a listing. */
@@ -174,6 +212,34 @@ export async function setVesselPublished(id: string, published: boolean): Promis
     { published, updatedAt: serverTimestamp() },
     { merge: true },
   );
+}
+
+/**
+ * One-off repair for documents seeded before the `wbsId` → `agmId` rename:
+ * persists the resolved listing ID wherever `agmId` is missing or blank.
+ * Idempotent — a second run writes nothing. Returns the number of documents
+ * updated so the dashboard can report it.
+ */
+export async function backfillAgmIds(): Promise<number> {
+  const db = getFirestoreDb();
+  const snap = await getDocs(query(collection(db, COLLECTION), limit(1000)));
+
+  const missing: { id: string; agmId: string }[] = [];
+  for (const d of snap.docs) {
+    const data = d.data() as Pick<VesselDoc, "agmId" | "wbsId">;
+    if (typeof data.agmId === "string" && data.agmId.trim() !== "") continue;
+    missing.push({ id: d.id, agmId: resolveAgmId(data, d.id) });
+  }
+
+  // Firestore caps a batch at 500 writes, so commit in chunks like the seed.
+  for (let i = 0; i < missing.length; i += 400) {
+    const batch = writeBatch(db);
+    for (const m of missing.slice(i, i + 400)) {
+      batch.set(doc(db, COLLECTION, m.id), { agmId: m.agmId }, { merge: true });
+    }
+    await batch.commit();
+  }
+  return missing.length;
 }
 
 /**

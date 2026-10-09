@@ -152,6 +152,7 @@ export default function VesselDetail() {
                 { label: "Location", value: vessel.location, icon: MapPin },
                 { label: "Price", value: vessel.price, icon: Tag },
                 ...vessel.specs,
+                ...(vessel.particulars ?? []),
               ].map((s) => {
                 const Icon = specIcons[s.label] ?? Hash;
                 return (
@@ -178,7 +179,22 @@ export default function VesselDetail() {
         >
           <h2 className="mb-4 text-lg font-black text-white">Description</h2>
           <div className="gradient-divider mb-4" />
-          <p className="leading-relaxed text-white/70">{vessel.summary}</p>
+          <p className="leading-relaxed text-white/70">{vessel.details ?? vessel.summary}</p>
+          {vessel.remarks && vessel.remarks.length > 0 && (
+            <>
+              <h3 className="mt-6 mb-3 text-xs font-black uppercase tracking-wider text-white/40">
+                Remarks
+              </h3>
+              <ul className="space-y-2">
+                {vessel.remarks.map((remark) => (
+                  <li key={remark} className="flex gap-2.5 text-sm leading-relaxed text-white/70">
+                    <span className="mt-2 h-1 w-1 shrink-0 rounded-full bg-[#FFCC00]" />
+                    {remark}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
           <p className="mt-4 text-xs text-white/30 italic">
             Details given in good faith but without guarantee. Offered subject to prior sale, charter or withdrawal without notice.
           </p>
@@ -193,7 +209,11 @@ export default function VesselDetail() {
           style={{ background: "linear-gradient(135deg, rgba(9,46,109,0.6) 0%, rgba(26,74,158,0.4) 100%)" }}
         >
           <h3 className="mb-1 text-base font-black text-white">Interested in {vessel.agmId}?</h3>
-          <p className="mb-5 text-sm text-white/50">Contact our brokers to get full particulars, schedule an inspection, or make an offer.</p>
+          <p className="mb-5 text-sm text-white/50">
+            {vessel.contact
+              ? `For full particulars, inspection or offers, contact ${vessel.contact} or our brokerage desk.`
+              : "Contact our brokers to get full particulars, schedule an inspection, or make an offer."}
+          </p>
           <div className="flex flex-wrap gap-3">
             <Link
               to="/contact"

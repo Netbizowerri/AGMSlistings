@@ -10,7 +10,9 @@ rules_version = '2';
  * The document ID is the public URL id (`v-1000`, `v-1001`, ...), so a listing's
  * `/vessels/:id` link survives a move from the old static data to Firestore.
  *
- *   wbsId       string   e.g. "WBS 1000"
+ *   agmId       string   e.g. "AGM 1000" — the public listing reference.
+ *               Documents seeded before the `wbsId` → `agmId` rename may also
+ *               carry the legacy `wbsId`, mirrored from `agmId` on every save.
  *   title       string
  *   sector      string   e.g. "For sale", "For charter"
  *   category    string   one of CATEGORY_LIST
@@ -54,11 +56,11 @@ service cloud.firestore {
     // written, so a half-saved document can never appear on the site.
     function validVessel(v) {
       return v.keys().hasAll([
-          'wbsId', 'title', 'sector', 'category', 'location', 'price',
+          'agmId', 'title', 'sector', 'category', 'location', 'price',
           'image', 'specs', 'summary', 'description', 'published',
           'createdAt', 'updatedAt'
         ])
-        && v.wbsId is string       && v.wbsId.size() > 0        && v.wbsId.size() <= 32
+        && v.agmId is string       && v.agmId.size() > 0        && v.agmId.size() <= 32
         && v.title is string       && v.title.size() > 0        && v.title.size() <= 200
         && v.sector is string      && v.sector.size() > 0       && v.sector.size() <= 40
         && v.category is string    && v.category.size() > 0     && v.category.size() <= 80
