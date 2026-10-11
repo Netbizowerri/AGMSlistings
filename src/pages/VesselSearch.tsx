@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -11,15 +11,23 @@ import {
   Loader2,
   Tag,
   AlertCircle,
+  Mail,
 } from "lucide-react";
 import { CATEGORY_LIST } from "../data/vessels";
 import { usePublishedVessels } from "../lib/useVessels";
+import { useSeo } from "../lib/seo";
 import VesselCard from "../components/VesselCard";
 
 const ALL = "All";
 const PAGE = 12;
 
 export default function VesselSearch() {
+  useSeo({
+    title: "Vessels for Sale & Charter in Nigeria | Tugs, Barges, Tankers — AGMS Ltd.",
+    description:
+      "Browse vessels for sale and charter in Nigeria and worldwide. Tugs, barges, oil tankers, AHTS, PSVs, crew transfer vessels and dredgers — updated daily by AGMS Ltd., Port Harcourt.",
+    path: "/vessels",
+  });
   const [searchParams] = useSearchParams();
   const [query, setQuery] = useState(searchParams.get("q") ?? "");
   const [cat, setCat] = useState(searchParams.get("category") ?? "");
@@ -65,6 +73,16 @@ export default function VesselSearch() {
   }, [vessels, query, cat, sec, loc, listingId]);
 
   const hasActiveFilter = query || cat || sec !== ALL || loc !== ALL || listingId;
+
+  /**
+   * What to offer when the filters match nothing.
+   *
+   * `results` is empty by definition here, so this is simply the unfiltered
+   * catalogue — today that is the "For Sale" inventory. Showing it keeps the
+   * page useful when a visitor picks a category the admin has not populated
+   * yet, instead of dead-ending on "no vessels found".
+   */
+  const fallback = useMemo(() => vessels, [vessels]);
 
   const clearAll = () => {
     setQuery("");
@@ -281,20 +299,63 @@ export default function VesselSearch() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-8 rounded-2xl border border-white/10 p-12 text-center"
-            style={{ background: "rgba(11,30,61,0.5)" }}
           >
-            <AlertCircle size={40} className="mx-auto mb-4 text-white/25" />
-            <h3 className="mb-2 text-lg font-bold text-white">No vessels found</h3>
-            <p className="text-sm text-white/40">
-              No vessels currently match your search. Please contact us with your requirements.
-            </p>
-            <button
-              onClick={clearAll}
-              className="mt-6 rounded-xl bg-[#FFCC00] px-6 py-3 text-sm font-bold text-[#092E6D] hover:bg-[#E6B800] transition"
-            >
-              Clear Filters
-            </button>
+            <div className="mt-8 rounded-2xl border border-white/10 p-8 text-center sm:p-12">
+              <AlertCircle size={40} className="mx-auto mb-4 text-white/25" />
+              <h3 className="mb-2 text-lg font-bold text-white">
+                {cat ? `No ${cat} currently listed` : "No vessels found"}
+              </h3>
+              <p className="mx-auto max-w-lg text-sm text-white/40">
+                {cat
+                  ? `We are not currently offering anything under ${cat}. Our broker keeps this category on file — send us your requirement and we will source it for you. Meanwhile, here is what is available today.`
+                  : "No vessels currently match your search. Please contact us with your requirements."}
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <button
+                  onClick={clearAll}
+                  className="rounded-xl bg-[#FFCC00] px-6 py-3 text-sm font-bold text-[#092E6D] hover:bg-[#E6B800] transition"
+                >
+                  Clear Filters
+                </button>
+                <Link
+                  to="/contact"
+                  className="inline-flex items-center gap-2 rounded-xl border-2 border-[#FFCC00]/40 px-6 py-3 text-sm font-bold text-[#FFCC00] hover:bg-[#FFCC00]/10 transition"
+                >
+                  <Mail size={15} />
+                  Request a {cat || "vessel"}
+                </Link>
+              </div>
+            </div>
+
+            {/* Never dead-end: when a chosen category is empty we still surface
+                the listings we DO have, so the page converts instead of
+                stranding the visitor. Only shown when the catalogue itself is
+                non-empty, otherwise there would be nothing to offer. */}
+            {fallback.length > 0 && (
+              <div className="mt-10">
+                <div className="mb-4 flex items-center gap-3">
+                  <h4 className="text-sm font-black uppercase tracking-widest text-[#FFCC00]">
+                    Available now
+                  </h4>
+                  <span className="text-xs text-white/40">
+                    {fallback.length} vessel{fallback.length !== 1 ? "s" : ""} currently offered
+                  </span>
+                </div>
+                <div className="gradient-divider mb-6" />
+                <div className="grid gap-4 md:grid-cols-2">
+                  {fallback.map((v, i) => (
+                    <motion.div
+                      key={v.id}
+                      initial={{ opacity: 0, y: 16 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: Math.min(i, 5) * 0.05, duration: 0.35 }}
+                    >
+                      <VesselCard vessel={v} />
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 

@@ -1,8 +1,15 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Send, Phone, Mail, MapPin, MessageCircle, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
+import { useSeo } from "../lib/seo";
 
 export default function Contact() {
+  useSeo({
+    title: "Contact AGMS Ltd. — Marine Brokers in Port Harcourt, Nigeria",
+    description:
+      "Contact AGMS Ltd., marine brokerage in Port Harcourt, Nigeria. Enquire about vessels for sale or charter in Nigeria and West Africa. Call +234 816 389 7314 or WhatsApp +234 807 349 2253.",
+    path: "/contact",
+  });
   const [status, setStatus] = useState<"idle" | "sending" | "ok" | "error">("idle");
   const [ref, setRef] = useState("");
 
@@ -67,25 +74,25 @@ export default function Contact() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/40">Your Name *</label>
-                  <input name="name" placeholder="John Smith" className={field} required />
+                  <input name="name" placeholder="John Smith" maxLength={100} autoComplete="name" className={field} required />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/40">Company</label>
-                  <input name="company" placeholder="Company name" className={field} />
+                  <input name="company" placeholder="Company name" maxLength={100} autoComplete="organization" className={field} />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/40">Email *</label>
-                  <input name="email" type="email" placeholder="you@company.com" className={field} required />
+                  <input name="email" type="email" placeholder="you@company.com" maxLength={254} autoComplete="email" inputMode="email" className={field} required />
                 </div>
                 <div>
                   <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/40">Phone</label>
-                  <input name="phone" placeholder="+234 ..." className={field} />
+                  <input name="phone" type="tel" placeholder="+234 ..." maxLength={40} autoComplete="tel" inputMode="tel" className={field} />
                 </div>
               </div>
 
               <div>
                 <label className="mb-1.5 block text-[11px] font-bold uppercase tracking-widest text-white/40">Vessel / AGM ID of Interest</label>
-                <input name="vessel" placeholder="e.g. AGM 1005 or Tug requirements" className={field} />
+                <input name="vessel" placeholder="e.g. AGM 1005 or Tug requirements" maxLength={100} className={field} />
               </div>
 
               <div>
@@ -94,6 +101,7 @@ export default function Contact() {
                   name="message"
                   placeholder="Describe your vessel requirements, charter needs, or questions..."
                   rows={5}
+                  maxLength={5000}
                   className={field}
                   required
                 />

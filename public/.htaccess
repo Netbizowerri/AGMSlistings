@@ -1,0 +1,65 @@
+# AGMS Ltd. — Apache config for cPanel static hosting.
+# Upload the contents of this folder to public_html and extract.
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+
+  # Let the real files and directories (/assets, /robots.txt, ...) through.
+  RewriteCond %{REQUEST_FILENAME} -f [OR]
+  RewriteCond %{REQUEST_FILENAME} -d
+  RewriteRule ^ - [L]
+
+  # Single-page-app fallback: unknown paths render index.html (react-router).
+  RewriteRule ^ index.html [L]
+</IfModule>
+
+# Correct MIME types (some cPanel defaults miss these)
+<IfModule mod_mime.c>
+  AddType application/javascript        .js
+  AddType text/css                      .css
+  AddType image/svg+xml                 .svg
+  AddType application/json              .json
+  AddType application/xml               .xml
+  AddType text/plain                    .txt
+  AddType font/woff2                    .woff2
+</IfModule>
+
+# Security headers (mirrors vercel.json)
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  Header always set Strict-Transport-Security "max-age=63072000; includeSubDomains"
+</IfModule>
+
+# Long-lived caching for hashed build assets
+<IfModule mod_expires.c>
+  ExpiresActive On
+  ExpiresByType text/css                "access plus 1 year"
+  ExpiresByType application/javascript  "access plus 1 year"
+  ExpiresByType image/png               "access plus 1 year"
+  ExpiresByType image/jpeg              "access plus 1 year"
+  ExpiresByType image/svg+xml           "access plus 1 year"
+  ExpiresByType font/woff2              "access plus 1 year"
+</IfModule>
+<FilesMatch "\.(js|css|png|jpg|jpeg|svg|woff2?|ico)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </IfModule>
+</FilesMatch>
+
+# Never cache the HTML shell, so new deploys are picked up immediately
+<FilesMatch "\.(html)$">
+  <IfModule mod_headers.c>
+    Header set Cache-Control "no-cache, must-revalidate"
+  </IfModule>
+</FilesMatch>
+
+# Keep dotfiles private
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+
+ErrorDocument 404 /index.html

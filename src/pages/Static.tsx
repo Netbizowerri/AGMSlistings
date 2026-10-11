@@ -1,4 +1,5 @@
 import { ReactNode } from "react";
+import { useSeo } from "../lib/seo";
 
 function Page({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -12,6 +13,12 @@ function Page({ title, children }: { title: string; children: ReactNode }) {
 }
 
 export function About() {
+  useSeo({
+    title: "About AGMS Ltd. — Marine Brokerage in Port Harcourt, Nigeria",
+    description:
+      "AGMS Ltd. is a marine brokerage and consultancy in Port Harcourt, Nigeria, helping owners and charterers buy, sell and charter commercial workboats worldwide.",
+    path: "/about",
+  });
   return (
     <Page title="About us">
       <p>
@@ -45,6 +52,12 @@ export function About() {
 }
 
 export function Privacy() {
+  useSeo({
+    title: "Privacy Policy — AGMS Ltd.",
+    description:
+      "How AGMS Ltd. collects, uses and protects personal information submitted through vessel enquiry forms.",
+    path: "/privacy",
+  });
   return (
     <Page title="Privacy Policy">
       <p>
@@ -67,6 +80,12 @@ export function Privacy() {
 }
 
 export function Legal() {
+  useSeo({
+    title: "Legal Statement & Disclaimer — AGMS Ltd.",
+    description:
+      "Confidentiality notice and disclaimer for AGMS Ltd., marine brokerage and consultancy, Port Harcourt, Nigeria.",
+    path: "/legal",
+  });
   return (
     <Page title="Legal Statement">
       <h2 className="text-xl font-bold text-[#092E6D]">Confidentiality Notice</h2>

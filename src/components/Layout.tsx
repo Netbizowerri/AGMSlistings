@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import {
   Link,
-  NavLink,
   Outlet,
   useLocation,
   useNavigate,
@@ -9,7 +8,6 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home as HomeIcon,
-  Info,
   Ship,
   Mail,
   Scale,
@@ -19,15 +17,60 @@ import {
   ChevronDown,
   Phone,
   Anchor,
+  // Aliased: this file already declares its own `Layout` component, and an
+  // unaliased lucide `Layout` collides with it.
+  Layout as LayoutIcon,
   Globe,
 } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import ChatBot from "./ChatBot";
 
-const nav = [
-  { to: "/", label: "Home", icon: HomeIcon },
-  { to: "/about", label: "About Us", icon: Info },
-  { to: "/vessels", label: "Vessel Search", icon: Ship },
-  { to: "/contact", label: "Contact Us", icon: Mail },
+/* Primary navigation, rendered by BOTH the desktop header and the mobile
+   drawer. `/vessels?sector=For+charter` matches the footer's charter link and
+   the `sector` param VesselSearch already reads, so no page changes were
+   needed. "Design" points at `/vessels` for now, matching the Home page's
+   "Browse Designs" card — it has no page of its own yet.
+   `/about` and `/contact` are intentionally absent: they stay reachable from
+   the footer quick links and the header's "Get a Quote" button.
+
+   Three entries share the `/vessels` pathname, so the active pill cannot come
+   from NavLink's pathname-only matching — every one of them would light up at
+   once. Each item therefore carries its own `active(pathname, query)` test,
+   keyed on the query string that makes it a distinct destination. Note this
+   also means `key` must be `label`, not `to`, since `to` is no longer unique. */
+const nav: {
+  to: string;
+  label: string;
+  icon: typeof Ship;
+  active: (pathname: string, q: URLSearchParams) => boolean;
+}[] = [
+  {
+    to: "/",
+    label: "Home",
+    icon: HomeIcon,
+    active: (p) => p === "/",
+  },
+  {
+    to: "/vessels",
+    label: "Ship For Sale",
+    icon: Ship,
+    active: (p, q) => p === "/vessels" && !q.get("sector"),
+  },
+  {
+    to: "/vessels?sector=For+charter",
+    label: "Ship For Charter",
+    icon: Anchor,
+    active: (p, q) => p === "/vessels" && q.get("sector") === "For charter",
+  },
+  {
+    // Same destination as "Ship For Sale", so the two highlight together on a
+    // bare `/vessels`. Giving Design its own page or query param would let it
+    // own its active state.
+    to: "/vessels",
+    label: "Design",
+    icon: LayoutIcon,
+    active: (p, q) => p === "/vessels" && !q.get("sector"),
+  },
 ];
 
 function Logo() {
@@ -57,6 +100,7 @@ export default function Layout() {
   const [legalOpen, setLegalOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const { pathname } = useLocation();
+  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
 
   const close = () => setOpen(false);
@@ -102,20 +146,17 @@ export default function Layout() {
           {/* Desktop nav */}
           <nav className="hidden items-center gap-1 lg:flex">
             {nav.map((n) => (
-              <NavLink
-                key={n.to}
+              <Link
+                key={n.label}
                 to={n.to}
-                end={n.to === "/"}
-                className={({ isActive }) =>
-                  `nav-pill relative px-4 py-2 text-[14px] font-semibold rounded-lg transition-all duration-200 ${
-                    isActive
-                      ? "active text-[#FFCC00] bg-white/10"
-                      : "text-white/85 hover:text-white hover:bg-white/10"
-                  }`
-                }
+                className={`nav-pill relative px-4 py-2 text-[14px] font-semibold rounded-lg transition-all duration-200 ${
+                  n.active(pathname, searchParams)
+                    ? "active text-[#FFCC00] bg-white/10"
+                    : "text-white/85 hover:text-white hover:bg-white/10"
+                }`}
               >
                 {n.label}
-              </NavLink>
+              </Link>
             ))}
 
             <div className="group relative ml-1">
@@ -193,24 +234,21 @@ export default function Layout() {
                   const Icon = n.icon;
                   return (
                     <motion.div
-                      key={n.to}
+                      key={n.label}
                       initial={{ opacity: 0, x: 20 }}
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: i * 0.06 }}
                     >
-                      <NavLink
+                      <Link
                         to={n.to}
-                        end={n.to === "/"}
                         onClick={close}
-                        className={({ isActive }) =>
-                          `flex items-center gap-3 rounded-xl px-4 py-3.5 font-semibold text-white transition-all hover:bg-[#3A64C2]/50 ${
-                            isActive ? "bg-[#3A64C2]/60" : "bg-white/5"
-                          }`
-                        }
+                        className={`flex items-center gap-3 rounded-xl px-4 py-3.5 font-semibold text-white transition-all hover:bg-[#3A64C2]/50 ${
+                          n.active(pathname, searchParams) ? "bg-[#3A64C2]/60" : "bg-white/5"
+                        }`}
                       >
                         <Icon size={20} className="text-[#FFCC00]" />
                         {n.label}
-                      </NavLink>
+                      </Link>
                     </motion.div>
                   );
                 })}

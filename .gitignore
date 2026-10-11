@@ -12,6 +12,14 @@ dist-ssr/
 
 *.log
 npm-debug.log*
+
+# Local scratch/build output that must never be committed
+build-output.txt
+build.txt
+typescript-errors.txt
+fix_quotes.cjs
+replace_wp.cjs
+agms-cpanel-deploy.zip
 .DS_Store
 .vscode/*
 !.vscode/extensions.json

@@ -46,6 +46,21 @@ const blurbs: Record<string, string> = {
     "Vessels offered for outright sale through our brokerage desk, with survey, documentation and worldwide delivery arranged.",
 };
 
+/**
+ * Blurb for a category, with a generic default.
+ *
+ * `CATEGORY_LIST` deliberately covers the whole taxonomy while only some
+ * categories have listings in `rows` below. Without the default, filing a row
+ * under an unblurbed category would interpolate `undefined` into the listing's
+ * `summary` (e.g. "undefined This unit is offered from…").
+ */
+function blurbFor(category: string): string {
+  return (
+    blurbs[category] ??
+    "Offered through our brokerage desk, with survey, documentation and worldwide delivery arranged by agreement."
+  );
+}
+
 /** title, location, price, built, loa, beam, draft, power/equipment, class, sector */
 type Row = [string, string, string, string, string, string, string, string, string, string];
 
@@ -379,7 +394,7 @@ Object.keys(rows).forEach((category) => {
       location,
       price,
       image: extra?.image ?? img[index % img.length],
-      summary: `${blurbs[category]} This unit is offered from ${location.toLowerCase()} with delivery by arrangement. Particulars are given in good faith and without guarantee.`,
+      summary: `${blurbFor(category)} This unit is offered from ${location.toLowerCase()} with delivery by arrangement. Particulars are given in good faith and without guarantee.`,
       specs: [
         { label: "Built", value: year },
         { label: "LOA", value: loa },
@@ -398,8 +413,54 @@ Object.keys(rows).forEach((category) => {
 
 export const vessels: Vessel[] = built;
 
-/** Full category list as shown in the vessel search dropdown. */
-export const CATEGORY_LIST = ["For Sale"];
+/**
+ * Full category list as shown in the vessel search dropdowns.
+ *
+ * This is deliberately the SHIPPED taxonomy, not what currently has listings.
+ * It is the complete set of types AGMS brokers deal in, so the dropdown stays
+ * useful the moment the admin populates a category — and the empty state on
+ * `VesselSearch` presents the real inventory when a chosen category has
+ * nothing published yet.
+ *
+ * Two notes:
+ *  - "For Sale" is kept even though it is absent from the original site's
+ *    list, because every existing listing in `rows` below uses it as its
+ *    category. Dropping it would make the whole current catalogue
+ *    unreachable through the category filter.
+ *  - The same array feeds the admin vessel form's category picker
+ *    (`AdminLogin.tsx`), so new listings can be filed under any of these.
+ */
+export const CATEGORY_LIST = [
+  "Barges",
+  "Cargo",
+  "Crane Barge",
+  "Crew vessels",
+  "Dive Vessels",
+  "Dredgers",
+  "Fire Fighting Vessels",
+  "Fishing Boats",
+  "For Charter",
+  "For Sale",
+  "Guard / Safety",
+  "Jack up Barges",
+  "Landing craft",
+  "Marine plant & equipment",
+  "Multi Purpose",
+  "Multicat",
+  "Passenger Ferries",
+  "Patrol boats",
+  "Pilot boats",
+  "Pollution control",
+  "Project vessel",
+  "Reduced In Price",
+  "Ribs & Tenders",
+  "Semi submarine",
+  "Supply Vessel",
+  "Survey",
+  "Tankers",
+  "Tugs",
+  "Uncategorized",
+];
 
 export const sectors = [
   "All",

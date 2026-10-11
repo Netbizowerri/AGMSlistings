@@ -1,0 +1,45 @@
+# robots.txt - AGMS Ltd. (https://www.agms.com.ng)
+# Allow crawling of the public site; keep the admin dashboard out of the index.
+
+User-agent: *
+Allow: /
+Disallow: /adminlogin
+Disallow: /admin
+
+# Search engines
+User-agent: Googlebot
+Allow: /
+
+User-agent: Googlebot-Image
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# AI / answer engines (GEO) — allowed to read and cite our inventory
+User-agent: GPTBot
+Allow: /
+
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+User-agent: Applebot-Extended
+Allow: /
+
+User-agent: CCBot
+Allow: /
+
+Sitemap: https://www.agms.com.ng/sitemap.xml
+Host: https://www.agms.com.ng

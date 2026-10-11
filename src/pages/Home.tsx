@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { usePublishedVessels } from "../lib/useVessels";
 import { CATEGORY_LIST } from "../data/vessels";
+import { useSeo } from "../lib/seo";
 import VesselCard from "../components/VesselCard";
 
 /* ─────────────── Hero slide data ─────────────── */
@@ -460,8 +461,49 @@ const features = [
   { icon: BarChart3, title: "Market Intelligence", desc: "Up-to-date pricing and market insight from our expert S&P brokers.", color: "#FF6B6B" },
 ];
 
+/* ─────────────── FAQ (SEO / GEO) ─────────────── */
+const faqs = [
+  {
+    q: "Where can I find vessels for sale in Nigeria?",
+    a: "AGMS Ltd. lists tugs, barges, oil tankers, AHTS, PSVs and crew boats for sale in Nigeria and worldwide from our brokerage desk in Port Harcourt. Browse the live inventory on our vessels page or contact us for vessels held off-market.",
+  },
+  {
+    q: "Do you help buy or charter a vessel in Port Harcourt?",
+    a: "Yes. We provide sale and purchase (S&P) brokerage, plus time, bareboat and spot chartering across Port Harcourt, Lagos, Warri, Onne and the wider West African region. Our brokers handle valuation, inspection and negotiation.",
+  },
+  {
+    q: "What types of commercial vessels do you broker?",
+    a: "We broker tugs, barges, oil and chemical tankers, AHTS, platform supply vessels (PSVs), crew transfer vessels, dredgers, and multi-purpose workboats for the offshore, coastal and inland sectors.",
+  },
+  {
+    q: "Do you offer vessel charter in West Africa?",
+    a: "Yes — time, bareboat and spot chartering across Nigeria, Ghana, Gabon, Cameroon and West Africa. Tell us your route, cargo, crew and duration and we will match a suitable vessel.",
+  },
+  {
+    q: "How do I enquire about a vessel?",
+    a: "Submit an enquiry from our contact page, email info@agms.com.ng, or WhatsApp +234 807 349 2253 quoting the AGM ID. Our brokerage desk responds within 24 hours.",
+  },
+];
+
+const faqJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: faqs.map((f) => ({
+    "@type": "Question",
+    name: f.q,
+    acceptedAnswer: { "@type": "Answer", text: f.a },
+  })),
+};
+
 /* ─────────────── Home page ─────────────── */
 export default function Home() {
+  useSeo({
+    title: "Marine Listing Website in Nigeria | Vessels for Sale & Charter — AGMS Ltd.",
+    description:
+      "AGMS Ltd. — marine listing website in Nigeria. Browse vessels for sale and charter in Port Harcourt: tugs, barges, tankers, AHTS, PSVs and workboats. Enquire today.",
+    path: "/",
+    jsonLd: faqJsonLd,
+  });
   const { vessels } = usePublishedVessels();
   const latest = vessels.slice(0, 6);
   const sectionRef = useRef<HTMLDivElement>(null);
@@ -611,6 +653,31 @@ export default function Home() {
                 </motion.div>
               );
             })}
+          </div>
+        </div>
+      </section>
+
+      {/* ── FAQ ── */}
+      <section className="px-4 py-16 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-3xl">
+          <div className="mb-8 text-center">
+            <div className="mb-2 text-[11px] font-black uppercase tracking-widest text-[#FFCC00]">FAQ</div>
+            <h2 className="text-3xl font-black text-white sm:text-4xl">Buying &amp; Chartering in Nigeria</h2>
+          </div>
+          <div className="space-y-3">
+            {faqs.map((f) => (
+              <details
+                key={f.q}
+                className="group rounded-2xl border border-white/10 p-5 transition hover:border-white/20"
+                style={{ background: "rgba(11,30,61,0.7)" }}
+              >
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 text-base font-bold text-white">
+                  {f.q}
+                  <ChevronRight size={18} className="shrink-0 text-[#FFCC00] transition-transform group-open:rotate-90" />
+                </summary>
+                <p className="mt-3 text-sm leading-relaxed text-white/60">{f.a}</p>
+              </details>
+            ))}
           </div>
         </div>
       </section>

@@ -14,6 +14,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useVessel } from "../lib/useVessels";
+import { useSeo } from "../lib/seo";
 
 const specIcons: Record<string, React.ElementType> = {
   "Built": Zap,
@@ -27,6 +28,18 @@ const specIcons: Record<string, React.ElementType> = {
 export default function VesselDetail() {
   const { id } = useParams();
   const { vessel, loading } = useVessel(id);
+
+  useSeo({
+    title: vessel
+      ? `${vessel.title} (${vessel.agmId}) — For Sale & Charter | AGMS Ltd.`
+      : "Vessel Listing — For Sale & Charter | AGMS Ltd.",
+    description: vessel
+      ? `${vessel.title} — ${vessel.category} for sale in ${vessel.location}. ${vessel.summary ?? ""}`.trim().slice(0, 300)
+      : "View vessel particulars, dimensions and pricing from AGMS Ltd., marine brokerage in Port Harcourt, Nigeria.",
+    path: `/vessels/${id ?? ""}`,
+    image: vessel?.image,
+    type: "article",
+  });
 
   if (loading) {
     return (
