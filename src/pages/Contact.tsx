@@ -3,6 +3,8 @@ import { motion } from "framer-motion";
 import { Send, Phone, Mail, MapPin, MessageCircle, CheckCircle, AlertCircle, Loader2 } from "lucide-react";
 import { useSeo } from "../lib/seo";
 
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/xppqlnor";
+
 export default function Contact() {
   useSeo({
     title: "Contact AGMS Ltd. — Marine Brokers in Port Harcourt, Nigeria",
@@ -19,14 +21,19 @@ export default function Contact() {
     const data = Object.fromEntries(fd.entries());
     setStatus("sending");
     try {
-      const res = await fetch("/api/enquiry", {
+      const res = await fetch(FORMSPREE_ENDPOINT, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          // Formspree returns JSON (instead of redirecting to its success page)
+          // only when the Accept header asks for it.
+          Accept: "application/json",
+          "content-type": "application/json",
+        },
         body: JSON.stringify(data),
       });
-      if (!res.ok) throw new Error();
-      const json = await res.json();
-      setRef(json.reference ?? "");
+      const json = (await res.json().catch(() => null)) as { ok?: boolean; id?: string } | null;
+      if (!res.ok || json?.ok === false) throw new Error();
+      setRef(json?.id ?? "");
       setStatus("ok");
       (e.target as HTMLFormElement).reset();
     } catch {

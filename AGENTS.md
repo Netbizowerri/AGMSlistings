@@ -55,6 +55,6 @@ Everything is generated at module load; there is no CMS or fetch.
 
 ## API & deploy
 
-- `api/enquiry.ts` is a Vercel Edge Function (`export const config = { runtime: "edge" }`). It validates `name`/`email`/`message` and returns a **fabricated** reference — the email-forwarding integration is an explicit TODO at line 20. It never sends mail.
-- The contact form POSTs to `/api/enquiry`, which **only exists on Vercel**. Under `npm run dev` the request 404s and the form shows its error state; use `vercel dev` to exercise it.
+- The contact ("Get a Quote") form POSTs JSON to **Formspree** at `https://formspree.io/f/xppqlnor` (endpoint constant in `src/pages/Contact.tsx`). Formspree forwards it to the inbox; the `next`/`id` fields in its JSON response drive the success state.
+- `api/enquiry.ts` is a Vercel Edge Function (`export const config = { runtime: "edge" }`). It validates `name`/`email`/`message` and returns a **fabricated** reference — the email-forwarding integration is an explicit TODO at line 20. It never sends mail. It is now orphaned (no frontend posts to `/api/enquiry`) but must stay deployable.
 - `vercel.json` rewrites everything except `/api/*` to `/index.html` for SPA deep links. Keep that exclusion if you touch it.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
 import type { User } from "firebase/auth";
 import { Link } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
@@ -18,7 +18,9 @@ import {
   RefreshCw,
   Search,
   Ship,
+  Tag,
   Trash2,
+  Upload,
   X,
 } from "lucide-react";
 import { firebaseConfigured } from "../lib/firebaseConfig";
@@ -42,10 +44,18 @@ import {
   type AdminVessel,
 } from "../lib/vessels";
 import { deleteBroker, listBrokers, resolveBrokerId, type Broker } from "../lib/brokers";
-import { CATEGORY_LIST } from "../data/vessels";
+import {
+  addTerm,
+  deleteTerm,
+  listTerms,
+  seedTerms,
+  type TaxonomyKind,
+  type TaxonomyTerm,
+} from "../lib/taxonomy";
+import { defaultTerms, termSlug } from "../data/taxonomy";
 
 type Status = { kind: "ok" | "err"; text: string } | null;
-type View = "dashboard" | "vessels" | "brokers";
+type View = "dashboard" | "vessels" | "brokers" | "categories" | "sectors";
 
 const SPEC_LABELS = ["Built", "LOA", "Beam", "Draft", "Power / capacity", "Class"];
 
@@ -194,12 +204,43 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [category, setCategory] = useState("");
   const autoSeeded = useRef(false);
 
+  // Admin-managed taxonomy. Initialised to the shipped list so the vessel form
+  // is usable before Firestore responds.
+  const [categories, setCategories] = useState<TaxonomyTerm[]>(() =>
+    defaultTerms("categories").map((name) => ({ id: termSlug(name), name })),
+  );
+  const [sectors, setSectors] = useState<TaxonomyTerm[]>(() =>
+    defaultTerms("sectors").map((name) => ({ id: termSlug(name), name })),
+  );
+
+  const loadTaxonomy = useCallback(async () => {
+    const load = async (kind: TaxonomyKind): Promise<TaxonomyTerm[]> => {
+      try {
+        let terms = await listTerms(kind);
+        // First run against empty collections: import the shipped taxonomy.
+        if (terms.length === 0) {
+          await seedTerms(kind);
+          terms = await listTerms(kind);
+        }
+        return terms;
+      } catch {
+        // Firestore may not have the taxonomy rules deployed yet; keep the
+        // shipped list so the dashboard and vessel form still work.
+        return defaultTerms(kind).map((name) => ({ id: termSlug(name), name }));
+      }
+    };
+    const [cats, secs] = await Promise.all([load("categories"), load("sectors")]);
+    setCategories(cats);
+    setSectors(secs);
+  }, []);
+
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
       const rows = await listAllVessels();
       setAll(rows);
       setBrokers(await listBrokers());
+      await loadTaxonomy();
       setStatus(null);
 
       // First run against an empty database: import the existing catalogue so
@@ -216,7 +257,7 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [loadTaxonomy]);
 
   useEffect(() => {
     void refresh();
@@ -278,6 +319,23 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     [brokerById],
   );
 
+  // How many live/draft listings reference each taxonomy term, so the admin can
+  // see the blast radius before removing one.
+  const categoryUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    all.forEach((v) => map.set(v.category, (map.get(v.category) ?? 0) + 1));
+    return map;
+  }, [all]);
+
+  const sectorUsage = useMemo(() => {
+    const map = new Map<string, number>();
+    all.forEach((v) => map.set(v.sector, (map.get(v.sector) ?? 0) + 1));
+    return map;
+  }, [all]);
+
+  const categoryNames = useMemo(() => categories.map((t) => t.name), [categories]);
+  const sectorNames = useMemo(() => sectors.map((t) => t.name), [sectors]);
+
   const runSeed = async () => {
     if (!window.confirm("Import any listings missing from the database?")) return;
     setSeeding(true);
@@ -302,6 +360,8 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const menu: { key: View; label: string; icon: typeof Ship; count?: number }[] = [
     { key: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { key: "vessels", label: "Vessels", icon: Ship, count: stats.total },
+    { key: "categories", label: "Categories", icon: Tag, count: categories.length },
+    { key: "sectors", label: "Sectors", icon: Anchor, count: sectors.length },
     { key: "brokers", label: "Brokers", icon: Handshake, count: stats.brokers },
   ];
 
@@ -429,6 +489,10 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
                 ? "Dashboard"
                 : view === "brokers"
                 ? "Brokers"
+                : view === "categories"
+                ? "Categories"
+                : view === "sectors"
+                ? "Sectors"
                 : "Vessel listings"}
             </h1>
             <p className="hidden text-[11px] text-[#93A5C4] sm:block">
@@ -436,6 +500,10 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
                 ? "AGMS brokerage console"
                 : view === "brokers"
                 ? `${stats.brokers} broker${stats.brokers === 1 ? "" : "s"} with listings in the catalogue`
+                : view === "categories"
+                ? `${categories.length} categor${categories.length === 1 ? "y" : "ies"} available when listing a vessel`
+                : view === "sectors"
+                ? `${sectors.length} sector${sectors.length === 1 ? "" : "s"} available when listing a vessel`
                 : `${stats.total} listings in the catalogue`}
             </p>
           </div>
@@ -488,6 +556,32 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
               }}
               onError={(t) => setStatus({ kind: "err", text: t })}
             />
+          ) : view === "categories" || view === "sectors" ? (
+            <TaxonomyView
+              singular={view === "categories" ? "category" : "sector"}
+              label={view === "categories" ? "Vessel categories" : "Vessel sectors"}
+              hint={
+                view === "categories"
+                  ? "Group listings by type. Public search dropdowns follow this list."
+                  : "How a listing is offered. Public search dropdowns follow this list."
+              }
+              icon={view === "categories" ? <Tag size={18} /> : <Anchor size={18} />}
+              terms={view === "categories" ? categories : sectors}
+              usage={(name) => (view === "categories" ? categoryUsage : sectorUsage).get(name) ?? 0}
+              onAdd={async (name) => {
+                await addTerm(view, name);
+                await loadTaxonomy();
+              }}
+              onDelete={async (term) => {
+                await deleteTerm(view, term.id);
+                await loadTaxonomy();
+              }}
+              onImport={async () => {
+                await seedTerms(view);
+                await loadTaxonomy();
+              }}
+              onError={(t) => setStatus({ kind: "err", text: t })}
+            />
           ) : (
             <VesselsView
               visible={visible}
@@ -512,7 +606,8 @@ function AdminApp({ user, onSignOut }: { user: User; onSignOut: () => void }) {
       {editing && (
         <VesselForm
           vessel={editing}
-          categories={CATEGORY_LIST}
+          categories={categoryNames}
+          sectors={sectorNames}
           brokers={brokers}
           onClose={() => setEditing(null)}
           onSaved={async () => {
@@ -692,6 +787,150 @@ function DashboardHome({
 
 function Empty({ children }: { children: ReactNode }) {
   return <p className="py-6 text-center text-sm text-[#93A5C4]">{children}</p>;
+}
+
+/* ------------------------------------------------------------- taxonomy */
+
+function TaxonomyView({
+  singular,
+  label,
+  hint,
+  icon,
+  terms,
+  usage,
+  onAdd,
+  onDelete,
+  onImport,
+  onError,
+}: {
+  singular: string;
+  label: string;
+  hint: string;
+  icon: ReactNode;
+  terms: TaxonomyTerm[];
+  usage: (name: string) => number;
+  onAdd: (name: string) => Promise<void>;
+  onDelete: (term: TaxonomyTerm) => Promise<void>;
+  onImport: () => Promise<void>;
+  onError: (t: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [removing, setRemoving] = useState<string | null>(null);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    const clean = name.trim();
+    if (!clean || busy) return;
+    setBusy(true);
+    try {
+      await onAdd(clean);
+      setName("");
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (term: TaxonomyTerm) => {
+    const n = usage(term.name);
+    const msg =
+      n > 0
+        ? `"${term.name}" is used by ${n} listing${n === 1 ? "" : "s"}. Removing it will not change those listings (they keep the old value). Remove anyway?`
+        : `Remove "${term.name}" from the ${singular} list?`;
+    if (!window.confirm(msg)) return;
+    setRemoving(term.id);
+    try {
+      await onDelete(term);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setRemoving(null);
+    }
+  };
+
+  const runImport = async () => {
+    if (!window.confirm(`Add any missing shipped ${singular} entries back to the list?`)) return;
+    setImporting(true);
+    try {
+      await onImport();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className={`${panelCls} p-4`}>
+        <div className="flex items-start gap-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[#3A64C2]/15 text-[#72AEE6]">
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-[#F0F4FF]">{label}</p>
+            <p className="mt-0.5 text-xs text-[#93A5C4]">{hint}</p>
+          </div>
+          <button onClick={() => void runImport()} disabled={importing} className={ghostBtn}>
+            <Upload size={15} />
+            <span className="hidden sm:inline">Import shipped list</span>
+          </button>
+        </div>
+
+        <form onSubmit={submit} className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={`Add a new ${singular}…`}
+            aria-label={`New ${singular} name`}
+            className={inputCls}
+          />
+          <button
+            type="submit"
+            disabled={busy || !name.trim()}
+            className={`${goldBtn} justify-center`}
+          >
+            <Plus size={15} />
+            {busy ? "Adding…" : "Add"}
+          </button>
+        </form>
+      </div>
+
+      {terms.length === 0 ? (
+        <div className={`${panelCls} px-6 py-12 text-center`}>
+          <p className="font-medium text-[#F0F4FF]">No {singular}s yet</p>
+          <p className="mx-auto mt-1 max-w-sm text-sm text-[#93A5C4]">
+            Add one above, or use “Import shipped list” to restore the defaults.
+          </p>
+        </div>
+      ) : (
+        <ul className={`divide-y divide-[#1B3465] ${panelCls}`}>
+          {terms.map((t) => {
+            const n = usage(t.name);
+            return (
+              <li key={t.id} className="flex items-center gap-3 px-4 py-3">
+                <span className="min-w-0 flex-1 truncate text-sm text-[#F0F4FF]">{t.name}</span>
+                <span className="shrink-0 rounded-md bg-[#050F24] px-2 py-0.5 text-[11px] tabular-nums text-[#93A5C4]">
+                  {n} listing{n === 1 ? "" : "s"}
+                </span>
+                <button
+                  onClick={() => void remove(t)}
+                  disabled={removing === t.id}
+                  aria-label={`Remove ${t.name}`}
+                  className="rounded-lg p-1.5 text-[#93A5C4] transition-colors hover:bg-[#F87171]/10 hover:text-[#F87171] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCC00]/50 disabled:opacity-50"
+                >
+                  <Trash2 size={15} />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /* --------------------------------------------------------------- vessels */
@@ -1293,6 +1532,7 @@ function BrokersView({
 function VesselForm({
   vessel,
   categories,
+  sectors,
   brokers,
   onClose,
   onSaved,
@@ -1301,6 +1541,7 @@ function VesselForm({
 }: {
   vessel: AdminVessel;
   categories: string[];
+  sectors: string[];
   brokers: Broker[];
   onClose: () => void;
   onSaved: () => Promise<void>;
@@ -1378,9 +1619,11 @@ function VesselForm({
                 onChange={(e) => set("category", e.target.value)}
                 className={selectCls}
               >
-                {categories.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
+                {[draft.category, ...categories]
+                  .filter((c, i, arr) => c && arr.indexOf(c) === i)
+                  .map((c) => (
+                    <option key={c}>{c}</option>
+                  ))}
               </select>
             </Field>
             <Field label="Sector">
@@ -1389,9 +1632,11 @@ function VesselForm({
                 onChange={(e) => set("sector", e.target.value)}
                 className={selectCls}
               >
-                {["For sale", "For charter", "For sale or charter"].map((s) => (
-                  <option key={s}>{s}</option>
-                ))}
+                {[draft.sector, ...sectors]
+                  .filter((s, i, arr) => s && arr.indexOf(s) === i)
+                  .map((s) => (
+                    <option key={s}>{s}</option>
+                  ))}
               </select>
             </Field>
             <Field label="Location" value={draft.location} onChange={(v) => set("location", v)} />

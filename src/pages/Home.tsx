@@ -18,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 import { usePublishedVessels } from "../lib/useVessels";
-import { CATEGORY_LIST } from "../data/vessels";
+import { useTaxonomy } from "../lib/useTaxonomy";
 import { useSeo } from "../lib/seo";
 import VesselCard from "../components/VesselCard";
 
@@ -311,7 +311,10 @@ function AdvancedSearch() {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const locations = useMemo(() => Array.from(new Set(vessels.map((v) => v.location))).sort(), [vessels]);
-  const sectors = useMemo(() => Array.from(new Set(vessels.map((v) => v.sector))).sort(), [vessels]);
+  // Categories and sectors are admin-managed; the dropdowns follow that list
+  // (falling back to the shipped taxonomy before Firestore is seeded).
+  const { terms: categories } = useTaxonomy("categories");
+  const { terms: sectors } = useTaxonomy("sectors");
 
   const results = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -387,7 +390,7 @@ function AdvancedSearch() {
         {/* Filters row */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           {[
-            { label: "Category", value: category, set: setCategory, opts: CATEGORY_LIST, placeholder: "All Categories" },
+            { label: "Category", value: category, set: setCategory, opts: categories, placeholder: "All Categories" },
             { label: "Location", value: location, set: setLocation, opts: locations, placeholder: "All Locations" },
             { label: "Sector", value: sector, set: setSector, opts: sectors, placeholder: "All Sectors" },
           ].map((f) => (

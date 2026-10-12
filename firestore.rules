@@ -32,10 +32,20 @@ rules_version = '2';
  * identities — business name, phone, email and address. It is readable and
  * writable by admins only, so broker identity never reaches the public site.
  *
+ * Two further collections hold the admin-managed taxonomy:
+ *
+ *   categories/{slug}  { name, createdAt, updatedAt }   one per vessel category
+ *   sectors/{slug}     { name, createdAt, updatedAt }   one per sector
+ *
+ * These are non-sensitive labels, so the public site may READ them to build its
+ * search dropdowns; only admins may change them. The document id is a slug of
+ * the name (e.g. "offshore-supply-vessels").
+ *
  * Authorisation model
  * -------------------
  * - Public visitors may read ONLY published listings. Drafts are invisible.
- * - Writes require an authenticated account present in `admins/{uid}`.
+ * - Public visitors may read the `categories` and `sectors` taxonomy.
+ * - All writes require an authenticated account present in `admins/{uid}`.
  * - There is deliberately NO enquiries collection: enquiries are handled by
  *   Formspree / Privyr, not Firestore.
  */
@@ -123,6 +133,31 @@ service cloud.firestore {
     match /brokers/{brokerId} {
       allow read: if isAdmin();
       allow create, update: if isAdmin() && validBroker(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // ---- Admin-managed taxonomy ------------------------------------------
+    // Category and sector labels feed the public site's search dropdowns, so
+    // they are world-readable; only admins may add or remove them. Vessel
+    // documents are NOT checked against these lists — Firestore rules cannot
+    // cheaply do a cross-collection membership lookup on every vessel write, so
+    // the admin form is the guardrail that keeps the two in sync.
+    function validTaxonomy(t) {
+      return t.keys().hasAll(['name', 'createdAt', 'updatedAt'])
+        && t.name is string       && t.name.size() > 0 && t.name.size() <= 80
+        && t.createdAt is timestamp
+        && t.updatedAt is timestamp;
+    }
+
+    match /categories/{termId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validTaxonomy(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /sectors/{termId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validTaxonomy(request.resource.data);
       allow delete: if isAdmin();
     }
 

@@ -13,8 +13,8 @@ import {
   AlertCircle,
   Mail,
 } from "lucide-react";
-import { CATEGORY_LIST } from "../data/vessels";
 import { usePublishedVessels } from "../lib/useVessels";
+import { useTaxonomy } from "../lib/useTaxonomy";
 import { useSeo } from "../lib/seo";
 import VesselCard from "../components/VesselCard";
 
@@ -39,10 +39,11 @@ export default function VesselSearch() {
 
   const { vessels, loading } = usePublishedVessels();
 
-  const sectors = useMemo(
-    () => [ALL, ...Array.from(new Set(vessels.map((v) => v.sector))).sort()],
-    [vessels]
-  );
+  // Categories and sectors are admin-managed; the filters follow those lists
+  // (falling back to the shipped taxonomy before Firestore is seeded).
+  const { terms: categoryTerms } = useTaxonomy("categories");
+  const { terms: sectorTerms } = useTaxonomy("sectors");
+  const sectors = [ALL, ...sectorTerms];
   const locations = useMemo(
     () => [ALL, ...Array.from(new Set(vessels.map((v) => v.location))).sort()],
     [vessels]
@@ -191,7 +192,7 @@ export default function VesselSearch() {
                 style={{ background: "rgba(11,30,61,0.6)" }}
               >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                  <FilterSelect label="Category" value={cat} set={setCat} opts={CATEGORY_LIST} placeholder="All Categories" />
+                  <FilterSelect label="Category" value={cat} set={setCat} opts={categoryTerms} placeholder="All Categories" />
                   <FilterSelect label="Sector" value={sec} set={setSec} opts={sectors} />
                   <FilterSelect label="Location" value={loc} set={setLoc} opts={locations} />
                   <div className="relative">
